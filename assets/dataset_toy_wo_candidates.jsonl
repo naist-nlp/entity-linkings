@@ -1,0 +1,8 @@
+{"id": "0001-P1", "text": "Steve Jobs was found Apple.", "entities": [{"start": 21, "end": 26, "label": ["000012"]}]}
+{"id": "0002-P1", "text": "Microsoft in America.", "entities": [{"start": 0, "end": 9, "label": ["000015"]}]}
+{"id": "0002-P2", "text": "Google in America.", "entities": [{"start": 0, "end": 6, "label": ["000011"]}]}
+{"id": "0003-P1", "text": "We've met at Facebook.", "entities": [{"start": 13, "end": 21, "label": ["000013"]}]}
+{"id": "0003-P2", "text": "We've met at amazon.", "entities": [{"start": 13, "end": 19, "label": ["000014", "-1"]}]}
+{"id": "0004-P1", "text": "Toyota propose a novel car", "entities": [{"start": 0, "end": 6, "label": ["-1"]}]}
+{"id": "0004-P2", "text": "Amazon and Sony sold a novel car", "entities": [{"start": 0, "end": 6, "label": ["000014"]}, {"start": 11, "end": 16, "label": ["-1"]}]}
+{"id": "0005-P1", "text": "I have an apple.", "entities": []}
