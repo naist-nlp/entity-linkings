@@ -17,13 +17,13 @@
 pip install entity-linkings
 
 # from the source
-git clone git@github.com:YuSawan/entity_linkings.git
-cd entity_linkings
+git clone git@github.com:naist-nlp/entity-linkings.git
+cd entity-linkings
 pip install .
 
 # for uv users
-git clone git@github.com:YuSawan/entity_linkings.git
-cd entity_linkings
+git clone git@github.com:naist-nlp/entity-linkings.git
+cd entity-linkings
 uv sync
 ```
 
