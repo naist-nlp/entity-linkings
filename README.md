@@ -6,7 +6,7 @@
 
 <p align="left">
 <a href="https://pypi.org/project/entity_linkings"><img alt="PyPi" src="https://img.shields.io/pypi/v/entity_linkings"></a>
-<a href="https://github.com/naist-nlp/entity-linkings/blob/main/LICENSE"><img alt="GitHub" src="https://img.shields.io/github/license/naist-nlp/entity_linkings"></a>
+<a href="https://github.com/naist-nlp/entity-linkings/blob/main/LICENSE"><img alt="GitHub" src="https://img.shields.io/github/license/naist-nlp/entity-linkings"></a>
 <a href=""><img src="https://github.com/naist-nlp/entity-linkings/actions/workflows/ci.yaml/badge.svg"></a>
 </p>
 
