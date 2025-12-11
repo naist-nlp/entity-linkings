@@ -1,7 +1,7 @@
 [project]
-name = "entity-linking-benchmark"
-version = "0.1.0"
-description = "A Library for Entity Linking benchmarking"
+name = "entity-linkings"
+version = "0.1.1"
+description = "A unified library for Entity Linking"
 readme = "README.md"
 requires-python = ">=3.11"
 
