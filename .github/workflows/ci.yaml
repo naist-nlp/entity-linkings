@@ -24,6 +24,9 @@ jobs:
           - "span_retrieval_e5bm25"
           - "disambiguate_fevry"
           - "disambiguate_blink"
+          - "disambiguate_chatel"
+          - "disambiguate_fusioned"
+          - "disambiguate_extend"
 
     runs-on: ${{ matrix.platform }}
     steps:
