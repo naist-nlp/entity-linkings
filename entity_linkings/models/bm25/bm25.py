@@ -8,7 +8,7 @@ from typing import Any, Literal, Optional
 from datasets import Dataset
 from tqdm.auto import tqdm
 
-from entity_linkings.entity_dictionary import EntityDictionaryBase
+from entity_linkings.data_utils import EntityDictionary
 from entity_linkings.utils import calculate_recall_mrr
 
 from ..base import EntityRetrieverBase
@@ -28,7 +28,7 @@ class BM25(EntityRetrieverBase):
         subword_tokenizer: Optional[str] = None
         query_type_for_candidate: Literal['mention', 'description'] = 'mention'
 
-    def __init__(self, dictionary: EntityDictionaryBase, config: Optional[Config] = None) -> None:
+    def __init__(self, dictionary: EntityDictionary, config: Optional[Config] = None) -> None:
         super().__init__(dictionary, config)
         self.retriever =  BM25Indexer(
             dictionary=self.dictionary,

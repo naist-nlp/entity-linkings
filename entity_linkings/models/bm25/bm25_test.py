@@ -54,7 +54,7 @@ class TestBM25Model:
         bm25_model = BM25(
             dictionary=dictionary,
             config=BM25.Config(
-                model_name_or_path="test_bm25_index",
+                model_name_or_path="test_bm25",
             )
         )
         sentence = "Steve Jobs was found Apple."
@@ -72,7 +72,7 @@ class TestBM25Model:
         bm25_model = BM25(
             dictionary=dictionary,
             config=BM25.Config(
-                model_name_or_path="test_bm25_index",
+                model_name_or_path="test_bm25",
                 query_type_for_candidate=query_type
             )
         )

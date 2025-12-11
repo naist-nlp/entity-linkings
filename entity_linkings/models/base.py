@@ -6,7 +6,7 @@ import numpy as np
 from datasets import Dataset
 from transformers import AutoTokenizer
 
-from entity_linkings.entity_dictionary import EntityDictionaryBase
+from entity_linkings.data_utils import EntityDictionary
 from entity_linkings.trainer import TrainingArguments
 
 
@@ -14,7 +14,7 @@ class IndexerBase(abc.ABC):
     @dataclass
     class Config: ...
 
-    def __init__(self, dictionary: EntityDictionaryBase, config: Optional[Config] = None) -> None:
+    def __init__(self, dictionary: EntityDictionary, config: Optional[Config] = None) -> None:
         self.dictionary = dictionary
         self.config = config if config is not None else self.Config()
 
@@ -47,7 +47,7 @@ class EntityRetrieverBase(abc.ABC):
         def to_dict(self) -> dict[str, Any]:
             return self.__dict__
 
-    def __init__(self, dictionary: EntityDictionaryBase, config: Optional[Config] = None) -> None:
+    def __init__(self, dictionary: EntityDictionary, config: Optional[Config] = None) -> None:
         self.dictionary = dictionary
         self.config = config if config is not None else self.Config()
 

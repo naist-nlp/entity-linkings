@@ -1,3 +1,5 @@
+import tempfile
+
 import pytest
 import torch
 from transformers import (
@@ -84,6 +86,7 @@ class TestCrossEncoder:
     @pytest.mark.parametrize("model_name", [MODELS[0]])
     def test_save_and_load(self, model_name: str) -> None:
         model = CrossEncoder(model_name)
-        model.save_pretrained("./test_crossencoder_save")
-        loaded_model = CrossEncoder.from_pretrained("./test_crossencoder_save")
-        assert isinstance(loaded_model, CrossEncoder)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            model.save_pretrained(tmpdir)
+            loaded_model = CrossEncoder.from_pretrained(tmpdir)
+            assert isinstance(loaded_model, CrossEncoder)

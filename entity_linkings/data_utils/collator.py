@@ -1,4 +1,5 @@
 import logging
+import random
 from dataclasses import dataclass
 from typing import Any, Optional, Union
 
@@ -7,7 +8,7 @@ from transformers import PreTrainedTokenizerBase
 from transformers.data.data_collator import pad_without_fast_tokenizer_warning
 from transformers.utils import PaddingStrategy
 
-from entity_linkings.entity_dictionary import EntityDictionaryBase
+from .entity_dictionary import EntityDictionary
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +55,7 @@ class CollatorBase:
 
 @dataclass
 class CollatorForRetrieval(CollatorBase):
-    dictionary: Optional[EntityDictionaryBase] = None
+    dictionary: Optional[EntityDictionary] = None
     num_hard_negatives: int = 0
     random_negative_sampling: bool = False
 
@@ -105,78 +106,9 @@ class CollatorForRetrieval(CollatorBase):
         return batch
 
 
-# @dataclass
-# class CollatorForSentenceRetrieval(CollatorBase):
-#     dictionary: Optional[EntityDictionaryBase] = None
-#     num_candidates: int = 64
-#     max_positive_ratio: float = 0.5
-#     random_ratio: float = 0.9
-
-#     def __call__(self, features: list[dict[str, Any]]) -> dict[str, Any]:
-#         if self.dictionary is None:
-#             raise ValueError("this modules needs to dictionary.")
-
-#         max_pos = max(1, int(self.num_candidates * self.max_positive_ratio))
-#         features = [f.copy() for f in features]
-#         batch_labels, candidate_features = [], []
-#         for f in features:
-#             cand_ids = []
-#             labels = f.pop("labels")
-#             labels = list(set([self.dictionary.get_label_id(label) for label in labels])) if len(labels) > 0 else [-1]
-#             hard_negative_ids = f.pop("candidates", None)
-#             hard_negative_ids = list(set([self.dictionary.get_label_id(hn) for hn in hard_negative_ids])) if hard_negative_ids is not None else []
-
-#             if len(labels) > max_pos:
-#                 cand_ids += random.sample(labels, max_pos)
-#                 num_pos = max_pos
-#             else:
-#                 cand_ids += labels
-#                 num_pos = len(labels)
-#             num_neg = self.num_candidates - num_pos
-#             assert num_neg >= 0
-#             if hard_negative_ids:
-#                 num_rands = int(self.random_ratio * num_neg)
-#                 num_hards = num_neg - num_rands
-#             else:
-#                 num_rands = num_neg
-#                 num_hards = 0
-#             rand_cands = sample_range_excluding(len(self.dictionary), num_rands, list(set(labels).union(set(hard_negative_ids))))
-#             cand_ids += rand_cands
-#             if hard_negative_ids:
-#                 hard_negs = random.sample(list(set(hard_negative_ids) - set(labels)), num_hards)
-#                 cand_ids += hard_negs
-
-#             batch_labels.append([1] * num_pos + [0] * (len(cand_ids) - num_pos))
-#             candidate_features.extend([self.dictionary[cand_id]["encoding"] for cand_id in cand_ids])
-
-#         batch = pad_without_fast_tokenizer_warning(
-#             self.tokenizer,
-#             features,
-#             padding=self.padding,
-#             max_length=self.max_length,
-#             pad_to_multiple_of=self.pad_to_multiple_of,
-#             return_tensors=self.return_tensors,
-#         )
-#         candidate_encodings = pad_without_fast_tokenizer_warning(
-#             self.tokenizer,
-#             candidate_features,
-#             padding=self.padding,
-#             max_length=self.max_length,
-#             pad_to_multiple_of=self.pad_to_multiple_of,
-#             return_tensors=None,
-#         )
-#         for k, v in candidate_encodings.items():
-#             cnum = len(v) // len(features)
-#             v = torch.tensor(v).view(len(features), cnum, -1)
-#             batch[f'candidates_{k}'] = v if self.return_tensors == "pt" else v.tolist()
-#         batch["labels"] = torch.tensor(batch_labels) if self.return_tensors == "pt" else batch_labels
-
-#         return batch
-
-
 @dataclass
 class CollatorForReranking(CollatorBase):
-    dictionary: Optional[EntityDictionaryBase] = None
+    dictionary: Optional[EntityDictionary] = None
     train: bool = False
 
     def __call__(self, features: list[dict[str, Any]]) -> dict[str, Any]:
@@ -232,7 +164,7 @@ class CollatorForReranking(CollatorBase):
 
 @dataclass
 class CollatorForCrossEncoder(CollatorBase):
-    dictionary: Optional[EntityDictionaryBase] = None
+    dictionary: Optional[EntityDictionary] = None
     train: bool = False
 
     def __call__(self, features: list[dict[str, Any]]) -> dict[str, Any]:
@@ -285,139 +217,82 @@ class CollatorForCrossEncoder(CollatorBase):
         return batch
 
 
-# @dataclass
-# class CollatorForExtend(CollatorBase):
-#     dictionary: Optional[EntityDictionaryBase] = None
-#     train: bool = False
-#     shuffle_candidates: bool = False
-#     candidates_separator: str = "*"
+@dataclass
+class CollatorForExtend(CollatorBase):
+    def __call__(self, features: list[dict[str, Any]]) -> dict[str, Any]:
+        candidates_offsets = []
+        start_positions, end_positions = [], []
+        features = [f.copy() for f in features]
+        for f in features:
+            _ = f.pop("offset_mapping", None)
+            candidates_offsets.append(f.pop("candidates_offsets"))
+            labels = f.pop("labels", None)
+            if labels is not None:
+                start_positions.append(labels[0][0])
+                end_positions.append(labels[0][1])
 
-#     def __call__(self, features: list[dict[str, Any]]) -> dict[str, Any]:
-#         if self.dictionary is None:
-#             raise ValueError("this modules needs to dictionary.")
+        batch = pad_without_fast_tokenizer_warning(
+            self.tokenizer,
+            features,
+            padding=self.padding,
+            max_length=self.max_length,
+            pad_to_multiple_of=self.pad_to_multiple_of,
+            return_tensors=self.return_tensors,
+        )
+        batch["candidates_offsets"] = torch.tensor(candidates_offsets) if self.return_tensors == "pt" else candidates_offsets
+        if start_positions and end_positions:
+            batch['labels'] = torch.tensor([start_positions, end_positions]) if self.return_tensors == "pt" else [start_positions, end_positions]
 
-#         features = [f.copy() for f in features]
-#         for f in features:
-#             context_tokens = f.pop("input_ids")
-#             golds = f.pop("labels")
-#             candidates_ids = f.pop("candidates")
-#             gold_titles = [self.dictionary(gold)["name"] for gold in golds]
-#             candidates = [self.dictionary(cand)['name'] for cand in candidates_ids]
-#             if self.train:
-#                 candidates = [gold_titles[0]] + candidates
-#             if self.shuffle_candidates:
-#                 random.shuffle(candidates)
-
-#             candidate_context = ""
-#             candidates_offsets = []
-#             answer_start, answer_end = [], []
-#             for candidate in candidates:
-#                 candidate_start = len(candidate_context)
-#                 candidate_end = candidate_start + len(candidate_context)
-#                 candidates_offsets.append((candidate_start, candidate_end))
-#                 if candidate in gold_titles:
-#                     answer_start.append(candidate_start)
-#                     answer_end.append(candidate_end)
-#                 candidate_context += candidate + f" {self.candidates_separator} "
-#             print(candidate_context)
-
-#             tokenization_output = self.tokenizer(
-#                 qa_sample.question,
-#                 qa_sample.context,
-#                 return_offsets_mapping=True,
-#                 return_tensors="pt",
-#             )
-
-#         batch = pad_without_fast_tokenizer_warning(
-#             self.tokenizer,
-#             batch_features,
-#             padding=self.padding,
-#             max_length=self.max_length,
-#             pad_to_multiple_of=self.pad_to_multiple_of,
-#             return_tensors=self.return_tensors,
-#         )
-
-#         if start_positions and end_positions:
-#             batch["start_positions"] = torch.tensor(start_positions) if self.return_tensors == "pt" else start_positions
-#             batch["end_positions"] = torch.tensor(end_positions) if self.return_tensors == "pt" else end_positions
-
-#         batch["candidates_ids"] = torch.tensor(batch_candidates) if self.return_tensors == "pt" else batch_candidates
-#         batch["labels"] = torch.tensor(batch_labels) if self.return_tensors == "pt" else batch_labels
-
-#         return batch
+        return batch
 
 
-# @dataclass
-# class CollatorForGeneration(CollatorBase):
-#     def __call__(self, features: list[dict[str, Any]]) -> dict[str, Any]:
-#         features = [f.copy() for f in features]
-#         labels = []
-#         for f in features:
-#             labels.append(f.pop("labels"))
+@dataclass
+class CollatorForFusioned(CollatorBase):
+    dictionary: Optional[EntityDictionary] = None
+    train: bool = False
 
-#         batch = pad_without_fast_tokenizer_warning(
-#             self.tokenizer,
-#             features,
-#             padding=self.padding,
-#             max_length=self.max_length,
-#             pad_to_multiple_of=self.pad_to_multiple_of,
-#             return_tensors=self.return_tensors,
-#         )
+    def __call__(self, features: list[dict[str, Any]]) -> dict[str, Any]:
+        if self.dictionary is None:
+            raise ValueError("this modules needs to dictionary.")
 
-#         if labels:
-#             batch["labels"] = pad_without_fast_tokenizer_warning(
-#                 self.tokenizer,
-#                 labels,
-#                 padding=self.padding,
-#                 max_length=self.max_length,
-#                 pad_to_multiple_of=self.pad_to_multiple_of,
-#                 return_tensors=self.return_tensors,
-#             )
+        features = [f.copy() for f in features]
+        new_features, labels = [], []
+        for f in features:
+            context_tokens = f.pop("input_ids")
+            golds = f.pop("labels")
+            labels.append(self.dictionary(golds[0])['name'])
+            candidates_ids = f.pop("candidates")
+            candidates = [self.dictionary(cand) for cand in candidates_ids]
+            if self.train:
+                candidates = [self.dictionary(golds[0])] + candidates[:-1]
+                random.shuffle(candidates)
+            for cand in candidates:
+                encoding = self.tokenizer.prepare_for_model(
+                    context_tokens + cand['encoding'],
+                    truncation=True,
+                    add_special_tokens=True,
+                )
+                new_features.append(encoding)
 
-#         return batch
+        batch = pad_without_fast_tokenizer_warning(
+            self.tokenizer,
+            new_features,
+            padding=self.padding,
+            max_length=self.max_length,
+            pad_to_multiple_of=self.pad_to_multiple_of,
+            return_tensors="pt",
+        )
 
+        for k, v in batch.items():
+            cnum = len(v) // len(features)
+            v = v.view(len(features), cnum, -1)
+            batch[k] = v if self.return_tensors == "pt" else v.tolist()
 
-# @dataclass
-# class CollatorForReader(CollatorBase):
-#     dictionary: Optional[EntityDictionaryBase] = None
-
-#     def __call__(self, features: list[dict[str, Any]]) -> dict[str, Any]:
-#         if self.dictionary is None:
-#             raise ValueError("this modules needs to dictionary.")
-
-#         features = [f.copy() for f in features]
-#         merged_encodings = []
-#         for f in features:
-#             input_ids = f.pop("input_ids")
-#             attention_mask = f.pop("attention_mask")
-#             token_type_ids = f.pop("token_type_ids", None)
-#             _ = f.pop("labels")
-#             candidates = f.pop("candidates")
-
-#             for cand in candidates:
-#                 encoding = self.dictionary(cand)["encoding"]
-#                 if encoding is None:
-#                     raise ValueError(f"Entity {cand} does not have encoding.")
-#                 merged_input_ids = input_ids + encoding["input_ids"][1:]
-#                 merged_attention_mask = attention_mask + encoding["attention_mask"][1:]
-#                 if token_type_ids is not None:
-#                     merged_token_type_ids = token_type_ids + encoding["token_type_ids"][1:]
-#                 merged_encoding = {
-#                     "input_ids": merged_input_ids,
-#                     "attention_mask": merged_attention_mask,
-#                 }
-#                 if token_type_ids is not None:
-#                     merged_encoding["token_type_ids"] = merged_token_type_ids
-#                 merged_encodings.append(merged_encoding)
-
-#         batch = pad_without_fast_tokenizer_warning(
-#             self.tokenizer,
-#             merged_encodings,
-#             padding=self.padding,
-#             max_length=self.max_length,
-#             pad_to_multiple_of=self.pad_to_multiple_of,
-#             return_tensors=self.return_tensors,
-#         )
-
-#         batch["labels"] = torch.zeros(len(features), dtype=torch.long) if self.return_tensors == "pt" else [0 for _ in range(len(features))]
-#         return batch
+        if labels:
+            batch['labels'] = self.tokenizer(
+                labels,
+                padding=True,
+                truncation=True,
+                return_tensors=self.return_tensors,
+            ).input_ids
+        return batch

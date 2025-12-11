@@ -7,16 +7,6 @@ import datasets
 from datasets import Column, Dataset
 from transformers import TrainingArguments
 
-VERSION = datasets.Version("1.0.0")
-
-dictionary_features = datasets.Features(
-    {
-        "dictionary": datasets.Value("string"),
-        "id": datasets.Value("string"),
-        "name": datasets.Value("string"),
-        "description": datasets.Value("string"),
-    }
-)
 
 class Entity(TypedDict):
     id: str
@@ -34,33 +24,36 @@ class EntityDictionaryConfig(datasets.BuilderConfig):
     description: Optional[str] = None
 
 
-class EntityDictionaryBase(abc.ABC):
-
-    @dataclass
-    class Config:
-        nil_id: str = "-1"
-        nil_name: str = "<NIL>"
-        nil_description: str = "<NIL> is an entity that does not exist in this dictionary."
-        default_description: str = """{name} is an entity in this dictionary."""
-        cache_dir: Optional[str|os.PathLike] = None
-
-    def __init__(self, dictionary: Dataset, config: Optional[Config] = None) -> None:
-        self.config = config if config is not None else self.Config()
+class EntityDictionary(abc.ABC):
+    def __init__(
+            self,
+            dictionary: Dataset,
+            nil_id: str = "-1",
+            nil_name: str = "<NIL>",
+            nil_description: str = "<NIL> is an entity that does not exist in this dictionary.",
+            default_description: str = """{name} is an entity in this dictionary.""",
+            cache_dir: Optional[str|os.PathLike] = None,
+        ) -> None:
         self.entity_dict = dictionary
         self.entity_dict = self.entity_dict.add_item({
-            "id": self.config.nil_id,
-            "name": self.config.nil_name,
-            "description": self.config.nil_description
+            "id": nil_id,
+            "name": nil_name,
+            "description": nil_description
         })
         self.id_to_index = {id: i for i, id in enumerate(self.entity_dict["id"])}
         self.title_to_index = {title: i for i, title in enumerate(self.entity_dict["name"])}
+        self.nil_id = nil_id
+        self.nil_name = nil_name
+        self.nil_description = nil_description
+        self.default_description = default_description
+        self.cache_dir = cache_dir
 
     def __call__(self, entity_id: str) -> Entity:
         if entity_id in self.id_to_index:
             index = self.id_to_index[entity_id]
             return self.entity_dict[index]
         else:
-            nil_index = self.id_to_index[self.config.nil_id]
+            nil_index = self.id_to_index[self.nil_id]
             return self.entity_dict[nil_index]
 
     def __iter__(self) -> Iterator[Entity]:
@@ -80,14 +73,14 @@ class EntityDictionaryBase(abc.ABC):
         if entity_id in self.id_to_index:
             return self.id_to_index[entity_id]
         else:
-            return self.id_to_index[self.config.nil_id]
+            return self.id_to_index[self.nil_id]
 
     def get_from_title(self, title: str) -> Entity:
         if title in self.title_to_index:
             index = self.title_to_index[title]
             return self.entity_dict[index]
         else:
-            nil_index = self.title_to_index[self.config.nil_name]
+            nil_index = self.title_to_index[self.nil_name]
             return self.entity_dict[nil_index]
 
     def get_entity_ids(self) -> Column:
@@ -103,7 +96,7 @@ class EntityDictionaryBase(abc.ABC):
         if description:
             return description
         else:
-            return self.config.default_description.format(name=name)
+            return self.default_description.format(name=name)
 
     def add_encoding(
             self,

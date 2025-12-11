@@ -4,8 +4,7 @@ from typing import Optional
 from datasets import Dataset
 from transformers import set_seed
 
-from entity_linkings.data_utils.collator import CollatorForRetrieval
-from entity_linkings.entity_dictionary.base import EntityDictionaryBase
+from entity_linkings.data_utils import CollatorForRetrieval, EntityDictionary
 from entity_linkings.models import BM25
 from entity_linkings.trainer import EntityLinkingTrainer, TrainingArguments
 
@@ -24,7 +23,7 @@ class E5BM25(SpanEntityRetrievalForTextEmbedding):
         query_type_for_candidate: str = "mention"
         language: str = "en"
 
-    def __init__(self, dictionary: EntityDictionaryBase, config: Optional[Config] = None) -> None:
+    def __init__(self, dictionary: EntityDictionary, config: Optional[Config] = None) -> None:
         super().__init__(dictionary, config)
 
     def train(

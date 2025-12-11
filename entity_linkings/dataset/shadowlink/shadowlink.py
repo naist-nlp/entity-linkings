@@ -111,7 +111,7 @@ class SHADOWLINK(GeneratorBasedBuilder):
                 "text": r_e["example"],
                 "entities": [{
                     "start": r_e["span"][0],
-                    "end": r_e["span"][1],
+                    "end": r_e["span"][0]+r_e["span"][1],
                     "label": [str(r_e["wiki_id"])]
                 }],
             }

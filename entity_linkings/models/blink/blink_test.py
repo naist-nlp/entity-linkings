@@ -1,3 +1,4 @@
+import tempfile
 from importlib.resources import files
 
 import pytest
@@ -5,7 +6,7 @@ from transformers.trainer_utils import TrainOutput
 
 import assets as test_data
 from entity_linkings import get_models, get_retrievers, load_dataset, load_dictionary
-from entity_linkings.entity_dictionary.base import Entity
+from entity_linkings.data_utils.entity_dictionary import Entity
 from entity_linkings.trainer import TrainingArguments
 
 from .blink import BLINK
@@ -33,10 +34,14 @@ class TestBLINK:
         assert hasattr(model, "config") and hasattr(model, "tokenizer") and hasattr(model, "dictionary")
         assert model.config.num_candidates == 30
         assert model.config.model_name_or_path == "google-bert/bert-base-uncased"
+        assert model.config.nil_token in model.tokenizer.all_special_tokens
+        assert model.config.ent_start_token in model.tokenizer.all_special_tokens
+        assert model.config.ent_end_token in model.tokenizer.all_special_tokens
+        assert model.config.entity_token in model.tokenizer.all_special_tokens
+        assert model.config.nil_token == "[NIL]"
         assert model.config.ent_start_token == "[START_ENT]"
         assert model.config.ent_end_token == "[END_ENT]"
         assert model.config.entity_token == "[ENT]"
-        assert model.config.nil_token == "[NIL]"
         assert model.config.max_context_length == 128
         assert model.config.max_candidate_length == 50
         assert model.config.pooling == 'first'
@@ -64,23 +69,24 @@ class TestBLINK:
 
     def test_train(self) -> None:
         model = BLINK(retriever=retriever, config=BLINK.Config(model_name_or_path=MODELS[0]))
-        result = model.train(
-            train_dataset=dataset,
-            eval_dataset=dataset,
-            training_args=TrainingArguments(
-                output_dir="./test_output",
-                num_train_epochs=1,
-                per_device_train_batch_size=2,
-                per_device_eval_batch_size=2,
-                logging_strategy="no",
-                save_strategy="no",
-                eval_strategy="no",
-                remove_unused_columns=False,
-                eval_on_start=True
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = model.train(
+                    train_dataset=dataset,
+                    eval_dataset=dataset,
+                    training_args=TrainingArguments(
+                        output_dir=tmpdir,
+                        num_train_epochs=1,
+                    per_device_train_batch_size=2,
+                    per_device_eval_batch_size=2,
+                    logging_strategy="no",
+                    save_strategy="no",
+                    eval_strategy="no",
+                    remove_unused_columns=False,
+                    eval_on_start=True
+                )
             )
-        )
-        assert isinstance(result, TrainOutput)
-        assert hasattr(result, 'metrics')
+            assert isinstance(result, TrainOutput)
+            assert hasattr(result, 'metrics')
 
     def test_evaluate(self) -> None:
         model = BLINK(retriever=retriever, config=BLINK.Config(model_name_or_path=MODELS[0]))

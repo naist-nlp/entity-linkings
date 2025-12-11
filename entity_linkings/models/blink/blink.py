@@ -8,9 +8,12 @@ from tqdm.auto import tqdm
 from transformers import BatchEncoding, EvalPrediction, set_seed
 from transformers.data.data_collator import pad_without_fast_tokenizer_warning
 
-from entity_linkings.data_utils import CollatorForCrossEncoder, cut_context_window
+from entity_linkings.data_utils import (
+    CollatorForCrossEncoder,
+    EntityDictionary,
+    cut_context_window,
+)
 from entity_linkings.dataset.utils import preprocess
-from entity_linkings.entity_dictionary import EntityDictionaryBase
 from entity_linkings.trainer import EntityLinkingTrainer, TrainingArguments
 from entity_linkings.utils import calculate_top1_accuracy
 
@@ -36,7 +39,7 @@ class BLINK(PipelineBase):
 
     def __init__(self, retriever: EntityRetrieverBase, config: Optional[Config] = None) -> None:
         super().__init__(retriever, config)
-        special_tokens = [self.config.ent_start_token, self.config.ent_end_token, self.config.entity_token]
+        special_tokens = [self.config.ent_start_token, self.config.ent_end_token, self.config.entity_token, self.config.nil_token]
         self.tokenizer.add_special_tokens({"additional_special_tokens": special_tokens})
         self.model = CrossEncoder(self.config.model_name_or_path, pooling=self.config.pooling)
         self.model.resize_token_embeddings(len(self.tokenizer))
@@ -66,7 +69,7 @@ class BLINK(PipelineBase):
                     yield encodings
         return preprocess(dataset, _preprocess_example)
 
-    def dictionary_preprocess(self, dictionary: EntityDictionaryBase) -> EntityDictionaryBase:
+    def dictionary_preprocess(self, dictionary: EntityDictionary) -> EntityDictionary:
         def preprocess_example(name: str, description: str) -> dict[str, list[int]]:
             text = self.convert_entity_template(name, description)
             encodings  = self.tokenizer.encode(
@@ -148,6 +151,7 @@ class BLINK(PipelineBase):
     @torch.no_grad()
     def evaluate(self, dataset: Dataset, num_candidates: int = 30, batch_size: int = 32, **args: int) -> dict[str, float]:
         self.model.eval()
+        self.model.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
         candidates = self.retriever.retrieve_candidates(
             dataset,
             only_negative=False,
@@ -172,7 +176,9 @@ class BLINK(PipelineBase):
         for batch in dataloader:
             pbar.update()
             labels = batch.pop("labels") # (batch_size, n_candidates)
+            batch = batch.to("cuda" if torch.cuda.is_available() else "cpu")
             _, scores = self.model(**batch) # (batch_size, n_candidates)
+            scores = scores.to('cpu')
             preds = scores.argmax(axis=1)  # (batch_size, )]
             labels = labels[range(preds.size(0)), preds]
             num_corrects = labels.sum().item()
@@ -186,6 +192,7 @@ class BLINK(PipelineBase):
         if not spans:
             raise ValueError("Spans must be provided for FEVRY prediction.")
         self.model.eval()
+        self.model.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
         candidates = self.retriever.predict(sentence, spans, top_k=num_candidates)
         all_result = []
         for i, (b, e) in enumerate(spans):
@@ -218,7 +225,9 @@ class BLINK(PipelineBase):
                 padding=True,
                 return_tensors="pt"
             ) # (n_candidates, ...)
+            encodings = encodings.to("cuda" if torch.cuda.is_available() else "cpu")
             scores = self.model.score(**encodings) # (n_candidates, )
+            scores = scores.to('cpu')
             preds = scores.argsort(descending=True)  # (n_candidates, )
             predict = [candidates[i][ind] for ind in preds]
             all_result.append(predict)

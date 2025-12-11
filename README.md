@@ -6,23 +6,23 @@
 
 <p align="left">
 <a href="https://pypi.org/project/entity_linkings"><img alt="PyPi" src="https://img.shields.io/pypi/v/entity_linkings"></a>
-<a href="https://github.com/naist-nlp/entity-linkings/blob/main/LICENSE"><img alt="GitHub" src="https://img.shields.io/github/license/naist-nlp/entity-linkings"></a>
-<a href=""><img src="https://github.com/naist-nlp/entity-linkings/actions/workflows/ci.yaml/badge.svg"></a>
+<a href="https://github.com/YuSawan/entity_linking_benchmark/blob/main/LICENSE"><img alt="GitHub" src="https://img.shields.io/github/license/YuSawan/entity_linkings"></a>
+<a href=""><img src="https://github.com/YuSawan/entity_linkings/actions/workflows/ci.yaml/badge.svg"></a>
 </p>
 
 
 ## Instllation
 ```
-# from PyPi (ToDO)
+# from PyPi
 pip install entity-linkings
 
 # from the source
-git clone git@github.com:naist-nlp/entity-linkings.git
+git clone git@github.com:YuSawan/entity_linkings.git
 cd entity_linkings
 pip install .
 
 # for uv users
-git clone git@github.com:naist/entity-linkings.git
+git clone git@github.com:YuSawan/entity_linkings.git
 cd entity_linkings
 uv sync
 ```
@@ -157,11 +157,10 @@ print("Score: ",  predictions[0][0]["score"])
 * Text Embedding Model
 * E5+BM25 ([Nakatani et al., 2025](https://aclanthology.org/2025.coling-main.486/))
 
-### Entity Disambiguation
+### Candidate Reranker
 * FEVRY ([Févry et al.,2020](https://arxiv.org/abs/2005.14253))
 * BLINK ([Wu et al., 2020](https://aclanthology.org/2020.emnlp-main.519/))
 * ExtEnD: ([Barba et al., 2022](https://aclanthology.org/2022.acl-long.177))
-* ReFinED ([Ayoola et al., 2022](https://aclanthology.org/2022.naacl-industry.24/))
 * FusionED: ([Wang et al., 2024](https://aclanthology.org/2024.naacl-long.363))
 * ChatEL ([Ding et al., 2024](https://aclanthology.org/2024.lrec-main.275))
 
@@ -175,22 +174,15 @@ print("Score: ",  predictions[0][0]["score"])
 ### Available Dictionaries
 | dictionary_id | Dataset | Language | Domain |
 | :-----  | :-----  | :----- | :------- |
-| `kilt_wiki` | KILT ([Petroni et al., 2021](https://github.com/facebookresearch/KILT/)) | English | Wikipedia |
-| `zelda_wiki`| ZELDA ([Milich and Akbik., 2023](https://github.com/flairNLP/zelda)) | English | Wikipedia |
-| `zeshel_wikia`| ZeshEL ([Logeswaran et al., 2021](https://github.com/lajanugen/zeshel)) | English | Wikia |
+| `kilt` | KILT ([Petroni et al., 2021](https://github.com/facebookresearch/KILT/)) | English | Wikipedia |
+| `zelda`| ZELDA ([Milich and Akbik., 2023](https://github.com/flairNLP/zelda)) | English | Wikipedia |
+| `zeshel`| ZeshEL ([Logeswaran et al., 2021](https://github.com/lajanugen/zeshel)) | English | Wikia |
 <!-- | `mesh` | MeSH | English | UMLS |
 | `entrez` | Entrez ([link](https://ftp.ncbi.nlm.nih.gov/gene/DATA/gene_info.gz)) | English | UMLS |
 | `medic` | MEDIC ([link](https://ctdbase.org/downloads)) | English | CTD Disease | -->
 <!-- * UMLS is licensed by the National Library of Medicine and requires a free account to download. You can sign up for an account at https://uts.nlm.nih.gov/uts/signup-login.
   * Once your account has been approved, you can download the UMLS metathesaurus at https://www.nlm.nih.gov/research/umls/licensedcontent/umlsknowledgesources.html.
 * MeSH is derived from UMLS -->
-* Please obtain the source data for the entity dictionary from the following link.
-  - `kilt_wiki`: [kilt-knowledgesource.json](http://dl.fbaipublicfiles.com/KILT/kilt_knowledgesource.json)
-  - `zelda_wiki`: [zelda_labels_verbalizations.json](https://drive.google.com/file/d/17MTxRbJteUkYx47ynzfE728vI47p96kY/view?usp=drive_link)
-  - `zeshel_wikia`: [zeshel.tar.bz2](https://drive.google.com/file/d/1ZcKZ1is0VEkY9kNfPxIG19qEIqHE5LIO/view?usp=sharing)
-* If you place the data in entity_linkings/entity_dictionary/`dictionary_id`/, `load_dictionary(<dictionary_id>)`.
-will automatically convert the data.
-* We plan to support downloading these dictionaries directly via libraries such as HuggingFace Datasets.
 
 ### Custom Entity Dictionary
 If you want to use our packages with your custom ontologies, you need to convert to the following format:
@@ -206,6 +198,8 @@ If you want to use our packages with your custom ontologies, you need to convert
 ### Public datasets
 | dataset_id | Dataset | Domain | Language | Ontology | Train | Licence |
 | :----- | :----- | :----- | :------- | :------- | :------- | :-------|
+| `kilt` | KILT ([Petroni et al., 2021](https://github.com/facebookresearch/KILT/)) | Wikipedia | English | Wikipedia | ✅ | Unknown* |
+| `zelda` | ZELDA ([Milich and Akbik., 2023](https://github.com/flairNLP/zelda)) | Wikimedia | English | Wikipedia | ✅ | Unknown* |
 | `msnbc` | MSNBC ([Cucerzan, 2007](http://research.microsoft.com/en-us/um/people/silviu/WebAssistant/TestData/)) | News | English | Wikipedia |  | Unknown* |
 | `aquaint` | AQUAINT ([Milne and Witten, 2008](https://community.nzdl.org/wikification/)) | News | English | Wikipedia | | Unknown* |
 | `ace2004` | ACE2004 ([Ratinov et al, 2011](https://cogcomp.seas.upenn.edu/page/resource_view/4)) | News | English | Wikipedia | | Unknown* |
@@ -241,9 +235,9 @@ If you want to use our packages with your custom ontologies, you need to convert
 * WikilinksNED Unseen-Mentions is created by splitting the [WikilinksNED](https://github.com/yotam-happy/NEDforNoisyText). The WikilinksNED is derived from the [Wikilinks corpus](https://code.google.com/archive/p/wiki-links/downloads), which is made available under CC-BY 3.0.
 * The folowing datasests is not publicly available or uncertain. If you want to evaluate these resource, please register the LDC and convert these dataset to our format.
   * AIDA CoNLL-YAGO ([Hoffart et al., 2011](https://www.mpi-inf.mpg.de/departments/databases-and-information-systems/research/ambiverse-nlu/aida/downloads)): You must sign the agreement to use [Reuter Corpus](https://trec.nist.gov/data/reuters/reuters.html)
+  * TACKBP-2010 ([Ji et al., 2011](https://blender.cs.illinois.edu/paper/kbp2011.pdf)): You must sign Text Analysis Conference (TAC) Knowledge Base Population Evaluation License Agreement.
   <!-- * ACE2004 ([Ratinov et al., 2011]()): You must sign the Linguistic Data Consortium (LDC) Licence Agreeement. -->
   <!-- * AQUAINT ([Milne and Witten, 2008](https://community.nzdl.org/wikification/)): AQUAINT consists 50 randomly selected arcles from the English portion of AQUAINT corpus, which is not publicly available. You can find the information [here](https://tac.nist.gov//data/data_desc.html) -->
-  * TACKBP-2010 ([Ji et al., 2011](https://blender.cs.illinois.edu/paper/kbp2011.pdf)): You must sign Text Analysis Conference (TAC) Knowledge Base Population Evaluation License Agreement.
 
 ### Custom Dataset
 If you want to use our packages with the your private dataset, you must convert it to the following format:

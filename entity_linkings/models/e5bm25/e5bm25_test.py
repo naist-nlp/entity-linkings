@@ -1,3 +1,4 @@
+import tempfile
 from importlib.resources import files
 
 import pytest
@@ -40,21 +41,22 @@ class TestE5BM25:
                 model_name_or_path=model_name
             )
         )
-        result = model.train(
-            train_dataset=dataset,
-            eval_dataset=dataset,
-            num_hard_negatives=1,
-            training_args=TrainingArguments(
-                output_dir="./test_output",
-                num_train_epochs=1,
-                per_device_train_batch_size=2,
-                per_device_eval_batch_size=2,
-                logging_strategy="no",
-                save_strategy="no",
-                eval_strategy="no",
-                remove_unused_columns=False,
-                eval_on_start=True
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = model.train(
+                    train_dataset=dataset,
+                    eval_dataset=dataset,
+                    num_hard_negatives=1,
+                    training_args=TrainingArguments(
+                    output_dir=tmpdir,
+                    num_train_epochs=1,
+                    per_device_train_batch_size=2,
+                    per_device_eval_batch_size=2,
+                    logging_strategy="no",
+                    save_strategy="no",
+                    eval_strategy="no",
+                    remove_unused_columns=False,
+                    eval_on_start=True
+                )
             )
-        )
-        assert isinstance(result, TrainOutput)
-        assert hasattr(result, 'metrics')
+            assert isinstance(result, TrainOutput)
+            assert hasattr(result, 'metrics')

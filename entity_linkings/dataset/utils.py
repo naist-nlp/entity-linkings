@@ -4,12 +4,12 @@ from typing import Any, Callable, Iterable, Iterator, Optional, Union
 
 import requests
 from datasets import Dataset
-from transformers import BatchEncoding, TrainingArguments
+from transformers import TrainingArguments
 
 
 def preprocess(
         dataset: Dataset,
-        processing_func: Callable[[Dataset], Iterator[BatchEncoding]],
+        processing_func: Callable[[Dataset], Iterator[Any]],
         training_arguments: Optional[TrainingArguments]=None
         ) -> dict[str, Dataset]:
     def _preprocess(documents: Dataset) -> Any:

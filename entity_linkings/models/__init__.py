@@ -4,8 +4,11 @@ from .base import (
 )
 from .blink import BLINK
 from .bm25 import BM25
+from .chatel import CHATEL
 from .e5bm25 import E5BM25
+from .extend import EXTEND
 from .fevry import FEVRY
+from .fusioned import FUSIONED
 from .span_retrieval import (
     SpanEntityRetrievalForDualEncoder,
     SpanEntityRetrievalForTextEmbedding,
@@ -28,6 +31,9 @@ RETRIEVER_CLS: list[type[EntityRetrieverBase]] = [
 ED_CLS: list[type[PipelineBase]] = [
     FEVRY,
     BLINK,
+    CHATEL,
+    FUSIONED,
+    EXTEND,
 ]
 
 EL_CLS: list[type[PipelineBase]] = []

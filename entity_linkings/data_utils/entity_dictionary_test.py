@@ -5,21 +5,20 @@ from datasets import Column, load_dataset
 import assets as test_data
 from entity_linkings import load_dictionary
 
-from .base import EntityDictionaryBase
+from .entity_dictionary import EntityDictionary
 
 dictionary_path = str(files(test_data).joinpath("dictionary_toy.jsonl"))
 
 
-class TestEntityDictionaryBase:
+class TestEntityDictionary:
     def test__init__(self) -> None:
         dictionary = load_dataset("json", data_files=dictionary_path, split="train")
-        dictionary = EntityDictionaryBase(dictionary)
-        assert isinstance(dictionary, EntityDictionaryBase)
-        assert dictionary.config.cache_dir is None
-        assert dictionary.config.cache_dir is None
-        assert dictionary.config.nil_id == "-1"
-        assert dictionary.config.nil_name == "<NIL>"
-        assert dictionary.config.nil_description == "<NIL> is an entity that does not exist in this dictionary."
+        dictionary = EntityDictionary(dictionary)
+        assert isinstance(dictionary, EntityDictionary)
+        assert dictionary.cache_dir is None
+        assert dictionary.nil_id == "-1"
+        assert dictionary.nil_name == "<NIL>"
+        assert dictionary.nil_description == "<NIL> is an entity that does not exist in this dictionary."
         assert dictionary.id_to_index == {"000011": 0, "000012": 1, "000013": 2, "000014": 3, "000015": 4, "-1": 5}
         assert isinstance(dictionary("000012"), dict) and dictionary("000012")["name"] == "Apple"
         assert isinstance(dictionary[0], dict) and dictionary[0]["name"] == "Google"

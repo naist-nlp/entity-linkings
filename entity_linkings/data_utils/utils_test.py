@@ -20,7 +20,7 @@ def test_filter_nil_entities() -> None:
     for example in filtered_dataset:
         for entity in example["entities"]:
             for label in entity["label"]:
-                assert dictionary(label) != dictionary.config.nil_id
+                assert dictionary(label) != dictionary.nil_id
     assert len(filtered_dataset) == len(dataset)
     assert len(filtered_dataset) == 8
 

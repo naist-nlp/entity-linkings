@@ -1,3 +1,4 @@
+import tempfile
 
 import pytest
 import torch
@@ -69,8 +70,9 @@ class TestSpanClassifier:
             assert logits.size() == (2, 10)
 
     def test_save_and_load_model(self) -> None:
-        encoder = SpanClassifier(model_name_or_path=MODELS[0], num_entities=20)
-        encoder.save_pretrained("test_model")
-        new_encoder = SpanClassifier.from_pretrained("test_model")
-        new_encoder.classifier.in_features == 1536
-        new_encoder.classifier.out_features == 20
+        with tempfile.TemporaryDirectory() as tmpdir:
+            encoder = SpanClassifier(model_name_or_path=MODELS[0], num_entities=20)
+            encoder.save_pretrained(tmpdir)
+            new_encoder = SpanClassifier.from_pretrained(tmpdir)
+            assert new_encoder.classifier.in_features == 1536
+            assert new_encoder.classifier.out_features == 20

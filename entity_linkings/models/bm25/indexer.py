@@ -9,7 +9,7 @@ import numpy as np
 from bm25s.hf import BM25HF
 from bm25s.tokenization import Tokenized
 
-from entity_linkings.entity_dictionary import EntityDictionaryBase
+from entity_linkings.data_utils import EntityDictionary
 
 from ..base import IndexerBase
 from .utils import ENGLISH_STOP_WORDS
@@ -28,7 +28,7 @@ class BM25Indexer(IndexerBase):
         n_threads: int = -1
         subword_tokenizer: Optional[str] = None
 
-    def __init__(self, dictionary: EntityDictionaryBase, config: Optional[Config] = None) -> None:
+    def __init__(self, dictionary: EntityDictionary, config: Optional[Config] = None) -> None:
         super().__init__(dictionary, config)
         if self.config.subword_tokenizer is not None:
             from transformers import AutoTokenizer

@@ -1,3 +1,4 @@
+import tempfile
 from importlib.resources import files
 
 import numpy as np
@@ -81,12 +82,12 @@ class TestBM25Indexer:
     def test_save_and_load(self) -> None:
         retriever = BM25Indexer(dictionary)
         retriever.build_index()
-        retriever.save_index("bm25_test")
-
-        loaded_retriever = BM25Indexer(dictionary, BM25Indexer.Config())
-        loaded_retriever.build_index(index_path="bm25_test")
-        assert retriever.dictionary and loaded_retriever.dictionary
-        assert retriever.meta_ids_to_keys == loaded_retriever.meta_ids_to_keys
+        with tempfile.TemporaryDirectory() as tmpdir:
+            retriever.save_index(tmpdir)
+            loaded_retriever = BM25Indexer(dictionary, BM25Indexer.Config())
+            loaded_retriever.build_index(index_path=tmpdir)
+            assert retriever.dictionary and loaded_retriever.dictionary
+            assert retriever.meta_ids_to_keys == loaded_retriever.meta_ids_to_keys
 
     def test_len(self) -> None:
         retriever = BM25Indexer(dictionary)

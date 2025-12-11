@@ -7,12 +7,16 @@ import assets as test_data
 from entity_linkings import get_retrievers, load_dataset, load_dictionary
 from entity_linkings.models import (
     BLINK,
+    EXTEND,
     FEVRY,
+    FUSIONED,
     SpanEntityRetrievalForDualEncoder,
 )
 
 from .collator import (
     CollatorForCrossEncoder,
+    CollatorForExtend,
+    CollatorForFusioned,
     CollatorForReranking,
     CollatorForRetrieval,
 )
@@ -44,28 +48,6 @@ def test_CollatorForRetrieval(model_cls: type) -> None:
         assert "labels" in batch
         assert batch["input_ids"].size(0) == batch["attention_mask"].size(0) == 2
         assert batch["candidates_input_ids"].size(0) == batch["candidates_attention_mask"].size(0) == 2
-
-
-# @pytest.mark.parametrize("model_cls", [SentenceEntityRetrievalForDualEncoder])
-# def test_CollatorForSentenceRetrieval(model_cls: type) -> None:
-#     model = model_cls(dictionary=dictionary)
-#     processed_dataset = model.data_preprocess(dataset)
-#     collator = CollatorForSentenceRetrieval(model.tokenizer, dictionary=dictionary, num_candidates=3)
-#     dataloader = DataLoader(processed_dataset, batch_size=2, collate_fn=collator)
-
-#     for batch in dataloader:
-#         assert "input_ids" in batch
-#         assert "attention_mask" in batch
-#         assert "token_type_ids" in batch
-#         assert "candidates_input_ids" in batch
-#         assert "candidates_attention_mask" in batch
-#         assert "candidates_token_type_ids" in batch
-#         assert "labels" in batch
-#         assert batch["input_ids"].size(0) == batch["attention_mask"].size(0) == 2
-#         assert batch["candidates_input_ids"].size(0) == batch["candidates_attention_mask"].size(0) == 2
-#         assert batch["candidates_input_ids"].size(1) == batch["candidates_attention_mask"].size(1) == 3
-#         assert batch["labels"].size() == (2, 3)
-#         break
 
 
 @pytest.mark.parametrize("model_cls", [FEVRY])
@@ -117,26 +99,46 @@ def test_CollatorForCrossEncoder(model_cls: type, train: bool) -> None:
             assert batch["labels"].size() == (2, 3)
 
 
-# @pytest.mark.parametrize("model_cls", [EXTEND])
-# @pytest.mark.parametrize("train", [True, False])
-# def test_CollatorForExtend(model_cls: type, train: bool) -> None:
-#     model = model_cls(retriever=retriever)
-#     candidates_ids = retriever.retrieve_candidates(dataset, top_k=3, only_negative=True)
-#     processed_dataset = model.data_preprocess(dataset)
-#     processed_dataset = processed_dataset.add_column("candidates", candidates_ids)
-#     collator = CollatorForExtend(model.tokenizer, dictionary=dictionary, train=train)
-#     dataloader = DataLoader(processed_dataset, batch_size=2, collate_fn=collator)
+@pytest.mark.parametrize("model_cls", [EXTEND])
+@pytest.mark.parametrize("train", [True, False])
+def test_CollatorForExtend(model_cls: type, train: bool) -> None:
+    model = model_cls(retriever=retriever)
+    candidates_ids = retriever.retrieve_candidates(dataset, top_k=3, only_negative=True)
+    filtered_dataset = model.data_filter(dataset)
+    processed_dataset = filtered_dataset.add_column("candidates", candidates_ids)
+    processed_dataset = model.data_preprocess(processed_dataset, train=train)
 
-#     for batch in dataloader:
-#         assert "input_ids" in batch
-#         assert "attention_mask" in batch
-#         assert "candidates_offsets" in batch
-#         assert "labels" in batch
-#         if train:
-#             assert batch["input_ids"].size(0) == batch["attention_mask"].size(0) == 2
-#             assert batch["input_ids"].size(1) == batch["attention_mask"].size(1) == 4
-#             assert batch["labels"].size() == (2, 2, 3)
-#         else:
-#             assert batch["input_ids"].size(0) == batch["attention_mask"].size(0) == 2
-#             assert batch["input_ids"].size(1) == batch["attention_mask"].size(1) == 3
-#             assert batch["labels"].size() == (2, 2, 3)
+    collator = CollatorForExtend(model.tokenizer)
+    dataloader = DataLoader(processed_dataset, batch_size=4, collate_fn=collator)
+
+    for batch in dataloader:
+        assert "input_ids" in batch
+        assert "attention_mask" in batch
+        assert "candidates_offsets" in batch
+        assert batch["input_ids"].size(0) == batch["attention_mask"].size(0) == 4
+        assert batch["input_ids"].size(1) == batch["attention_mask"].size(1)
+        assert batch["candidates_offsets"].size() == (4, 3, 2)
+        if train:
+            assert "labels" in batch
+            assert batch["labels"].size() == (2, 4)
+        else:
+            assert "labels" not in batch
+
+
+@pytest.mark.parametrize("model_cls", [FUSIONED])
+@pytest.mark.parametrize("train", [True, False])
+def test_CollatorForFusioned(model_cls: type, train: bool) -> None:
+    model = model_cls(retriever=retriever)
+    candidates_ids = retriever.retrieve_candidates(dataset, top_k=3, only_negative=True)
+    processed_dataset = model.data_preprocess(dataset)
+    processed_dataset = processed_dataset.add_column("candidates", candidates_ids)
+    collator = CollatorForFusioned(model.tokenizer, dictionary=dictionary, train=train)
+    dataloader = DataLoader(processed_dataset, batch_size=2, collate_fn=collator)
+
+    for batch in dataloader:
+        assert "input_ids" in batch
+        assert "attention_mask" in batch
+        assert "labels" in batch
+        assert batch["input_ids"].size(0) == batch["attention_mask"].size(0) == 2
+        assert batch["input_ids"].size(1) == batch["attention_mask"].size(1) == 3
+        assert batch["labels"].size(0) == 2

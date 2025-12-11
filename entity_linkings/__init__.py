@@ -4,8 +4,8 @@ from typing import Optional, Union
 import datasets
 from datasets import Dataset, DatasetDict
 
+from .data_utils import EntityDictionary
 from .dataset import DATASET_ID2CLS
-from .entity_dictionary import DICTIONARY_ID2CLS, EntityDictionaryBase
 from .models import (
     ED_ID2CLS,
     EL_ID2CLS,
@@ -13,20 +13,6 @@ from .models import (
     EntityRetrieverBase,
     PipelineBase,
 )
-
-
-def get_dataset_ids() -> list[str]:
-    '''Generate a list of ids with the class name in lower case.
-    '''
-    ids = list(DATASET_ID2CLS.keys())
-    return ids
-
-
-def get_dictionary_ids() -> list[str]:
-    '''Generate a list of ids with the class name in lower case.
-    '''
-    ids = list(DICTIONARY_ID2CLS.keys())
-    return ids
 
 
 def get_retriever_ids() -> list[str]:
@@ -71,11 +57,20 @@ def load_dataset(
         if not data_files:
             raise ValueError("Either name or data_files must be provided.")
         dataset = datasets.load_dataset("json", data_files=data_files, cache_dir=cache_dir)
+    elif name in ["zelda", "kilt", "zeshel", "unseen", "tweeki", "reddit-comments", "reddit-posts", "wned-wiki", "wned-cweb"] or name.startswith("naist-nlp/"):
+        subset = str(name.split('-')[1]) if '-' in name else None
+        name = name.split('-')[0]
+        if not name.startswith("naist-nlp/"):
+            name = f"naist-nlp/{name}"
+        if subset:
+            dataset = datasets.load_dataset(name, subset, cache_dir=cache_dir)
+        else:
+            dataset = datasets.load_dataset(name, cache_dir=cache_dir)
     else:
         subset = str(name.split('-')[1]) if '-' in name else None
         name = name.split('-')[0]
-        if name not in get_dataset_ids():
-            raise ValueError(f"The id should be one of {get_dataset_ids()}.")
+        if name not in DATASET_ID2CLS:
+            raise ValueError(f"The id should be one of {list(DATASET_ID2CLS.keys())}.")
         dataset_cls = DATASET_ID2CLS[name]
         if subset:
             dataset_cls(config_name=subset, cache_dir=cache_dir).download_and_prepare()
@@ -96,25 +91,24 @@ def load_dictionary(
         nil_description: str = "[NIL] is an entity that does not exist in this dictionary.",
         default_description: str = """{name} is an entity in this dictionary.""",
         cache_dir: Optional[str|os.PathLike] = None,
-    ) -> EntityDictionaryBase:
+    ) -> EntityDictionary:
     '''Generate a dictionary of ids and classes with the class name in lower case as the key.
     '''
     if os.path.isfile(dictionary_name_or_path):
         dictionary = datasets.load_dataset("json", data_files=dictionary_name_or_path, cache_dir=cache_dir, split="train")
     else:
-        if dictionary_name_or_path not in get_dictionary_ids():
-            raise ValueError(f"The id should be one of {get_dictionary_ids()}.")
-        dictionary_cls = DICTIONARY_ID2CLS[dictionary_name_or_path]
-        dictionary_cls(cache_dir=cache_dir).download_and_prepare()
-        dictionary = dictionary_cls(cache_dir=cache_dir).as_dataset()['dictionary']
+        if not dictionary_name_or_path.startswith("naist-nlp/"):
+            dictionary_name_or_path = f"naist-nlp/{dictionary_name_or_path}"
+        dictionary = datasets.load_dataset(dictionary_name_or_path, 'dictionary', split='kb', cache_dir=cache_dir)
 
-    return EntityDictionaryBase(dictionary=dictionary, config=EntityDictionaryBase.Config(
+    return EntityDictionary(
+        dictionary=dictionary,
         nil_id=nil_id,
         nil_name=nil_name,
         nil_description=nil_description,
         default_description=default_description,
         cache_dir=cache_dir,
-    ))
+    )
 
 
 def get_ed_models(name: str) -> type[PipelineBase]:

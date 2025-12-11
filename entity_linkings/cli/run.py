@@ -46,8 +46,15 @@ def main(args: Namespace) -> None:
 
         if not spans:
             if args.model_type != 'el':
-                print("No spans found. Please enclose entity mentions in double square brackets like [[entity]].\n")
-                continue
+                import spacy
+                nlp = spacy.load("en_core_web_sm")
+                doc = nlp(sentence)
+                spans = [(ent.start_char, ent.end_char) for ent in doc.ents]
+                if not spans:
+                    logger.warning("No spans found using SpaCy. If you already find the spans, please enclose entity mentions in double square brackets like [[entity]].\n")
+                    continue
+                else:
+                    print(f'Automatically detected spans with SpaCy: {[sentence[b:e] for b, e in spans]}')
 
         print('================================')
         if args.model_type == 'retrieval':
@@ -65,11 +72,12 @@ def main(args: Namespace) -> None:
 
         for i, span_preds in enumerate(predictions):
             print(f'Span {i+1}: {sentence[spans[i][0]:spans[i][1]]}')
+            if len(span_preds) == 0:
+                print('  No predictions found.')
+                continue
             for j, pred in enumerate(span_preds):
                 print(f'  Top {j+1}: {pred["prediction"]} (ID: {pred["id"]}) - Score: {pred["score"]}')
             print()
-        else:
-            print("No spans found. Please enclose entity mentions in double square brackets like [[entity]].\n")
 
 
 def cli_main() -> None:

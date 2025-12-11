@@ -4,14 +4,14 @@ from typing import Any
 
 from datasets import Dataset
 
-from entity_linkings import EntityDictionaryBase
+from .entity_dictionary import EntityDictionary
 
 
-def filter_nil_entities(dataset: Dataset, dictionary: EntityDictionaryBase) -> Dataset:
+def filter_nil_entities(dataset: Dataset, dictionary: EntityDictionary) -> Dataset:
     def filter_fn(example: dict[str, Any]) -> dict[str, Any]:
         entities = []
         for entity in example["entities"]:
-            labels = [label for label in entity["label"] if dictionary(label) != dictionary.config.nil_id]
+            labels = [label for label in entity["label"] if dictionary(label) != dictionary.nil_id]
             if labels:
                 entities.append({"start": entity["start"], "end": entity["end"], "label": labels})
         example.update({"entities": entities})
