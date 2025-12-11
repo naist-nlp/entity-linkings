@@ -1,3 +1,5 @@
+import tempfile
+
 import pytest
 import torch
 
@@ -94,10 +96,11 @@ class TestTextEmbeddingModel:
         assert model.encoder.config.vocab_size == 100
 
     def test_save_and_load(self) -> None:
-        model = TextEmbeddingModel(TEXT_EMBEDDING_MODELS[0], pooling="mean", distance="cosine")
-        model.save_pretrained("test_model")
-        new_model = TextEmbeddingModel.from_pretrained("test_model")
-        assert new_model.config == model.config
+        with tempfile.TemporaryDirectory() as tmpdir:
+            model = TextEmbeddingModel(TEXT_EMBEDDING_MODELS[0], pooling="mean", distance="cosine")
+            model.save_pretrained(tmpdir)
+            new_model = TextEmbeddingModel.from_pretrained(tmpdir)
+            assert new_model.config == model.config
 
 
 class TestDualBERTModel:
@@ -147,9 +150,10 @@ class TestDualBERTModel:
         assert model.candidate_encoder.config.vocab_size == 100
 
     def test_save_and_load(self) -> None:
-        model = DualBERTModel(BERT_MODELS[0], pooling="mean", distance="cosine")
-        model.resize_token_embeddings(100)
-        model.save_pretrained("test_model")
-        new_model = DualBERTModel.from_pretrained("test_model")
-        assert new_model.mention_encoder.config.vocab_size == 100
-        assert new_model.candidate_encoder.config.vocab_size == 100
+        with tempfile.TemporaryDirectory() as tmpdir:
+            model = DualBERTModel(BERT_MODELS[0], pooling="mean", distance="cosine")
+            model.resize_token_embeddings(100)
+            model.save_pretrained(tmpdir)
+            new_model = DualBERTModel.from_pretrained(tmpdir)
+            assert new_model.mention_encoder.config.vocab_size == 100
+            assert new_model.candidate_encoder.config.vocab_size == 100

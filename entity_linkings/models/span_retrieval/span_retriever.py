@@ -14,9 +14,12 @@ from transformers import (
     set_seed,
 )
 
-from entity_linkings.data_utils import CollatorForRetrieval, cut_context_window
+from entity_linkings.data_utils import (
+    CollatorForRetrieval,
+    EntityDictionary,
+    cut_context_window,
+)
 from entity_linkings.dataset.utils import preprocess
-from entity_linkings.entity_dictionary import EntityDictionaryBase
 from entity_linkings.models import EntityRetrieverBase
 from entity_linkings.trainer import EntityLinkingTrainer, TrainingArguments
 from entity_linkings.utils import calculate_recall_mrr
@@ -60,7 +63,7 @@ class SpanEntityRetrievalBase(EntityRetrieverBase):
         temperature: float = 1.0
         context_window_chars: int = 500
 
-    def __init__(self, dictionary: EntityDictionaryBase, config: Optional[Config] = None) -> None:
+    def __init__(self, dictionary: EntityDictionary, config: Optional[Config] = None) -> None:
         super().__init__(dictionary, config)
         self.tokenizer = AutoTokenizer.from_pretrained(self.config.model_name_or_path)
         special_tokens = [self.config.ent_start_token, self.config.ent_end_token, self.config.entity_token, self.config.nil_token]
@@ -112,7 +115,7 @@ class SpanEntityRetrievalBase(EntityRetrieverBase):
                         yield encodings
         return preprocess(dataset, _preprocess_example)
 
-    def dictionary_preprocess(self, dictionary: EntityDictionaryBase) -> EntityDictionaryBase:
+    def dictionary_preprocess(self, dictionary: EntityDictionary) -> EntityDictionary:
         def preprocess_example(name: str, description: str) -> dict[str, list[int]]:
             text = self.convert_entity_template(name, description)
             encodings  = self.tokenizer(
@@ -301,7 +304,7 @@ class SpanEntityRetrievalForDualEncoder(SpanEntityRetrievalBase):
         model_name_or_path: Optional[str] = "google-bert/bert-base-uncased"
         use_blink: bool = False
 
-    def __init__(self, dictionary: EntityDictionaryBase, config: Optional[Config] = None) -> None:
+    def __init__(self, dictionary: EntityDictionary, config: Optional[Config] = None) -> None:
         super().__init__(dictionary, config)
         if os.path.exists(self.config.model_name_or_path):
             print(f"Loading model from {self.config.model_name_or_path}")
@@ -351,7 +354,7 @@ class SpanEntityRetrievalForTextEmbedding(SpanEntityRetrievalBase):
         prefix_candidate: Optional[str] = "passage: "
         task_description: Optional[str] = ""
 
-    def __init__(self, dictionary: EntityDictionaryBase, config: Optional[Config] = None) -> None:
+    def __init__(self, dictionary: EntityDictionary, config: Optional[Config] = None) -> None:
         super().__init__(dictionary, config)
         if os.path.exists(self.config.model_name_or_path):
             print(f"Loading model from {self.config.model_name_or_path}")

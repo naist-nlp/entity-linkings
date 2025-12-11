@@ -6,7 +6,7 @@ from typing import Any, Optional
 from datasets import Dataset
 from tqdm.auto import tqdm
 
-from entity_linkings.entity_dictionary import EntityDictionaryBase
+from entity_linkings.data_utils import EntityDictionary
 from entity_linkings.utils import calculate_recall_mrr
 
 from ..base import EntityRetrieverBase
@@ -22,7 +22,7 @@ class ZELDACL(EntityRetrieverBase):
     @dataclass
     class Config(EntityRetrieverBase.Config): ...
 
-    def __init__(self, dictionary: EntityDictionaryBase, config: Optional[Config] = None) -> None:
+    def __init__(self, dictionary: EntityDictionary, config: Optional[Config] = None) -> None:
         super().__init__(dictionary, config)
         self.retriever =  ZeldaCandidateIndexer(dictionary=self.dictionary, config = ZeldaCandidateIndexer.Config())
         self.retriever.build_index(self.config.model_name_or_path)

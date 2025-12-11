@@ -15,8 +15,8 @@ from transformers import AutoTokenizer, BatchEncoding
 
 import assets as test_data
 from entity_linkings import load_dataset, load_dictionary
+from entity_linkings.data_utils import EntityDictionary
 from entity_linkings.dataset.utils import preprocess
-from entity_linkings.entity_dictionary.base import EntityDictionaryBase
 from entity_linkings.models.span_retrieval import DualBERTModel
 
 from .indexer import DenseRetriever
@@ -49,7 +49,7 @@ def dataset_preprocess(dataset: Dataset) -> DatasetDict:
     return preprocess(dataset, _preprocess_example)
 
 
-def dictionary_preprocess(dictionary: EntityDictionaryBase) -> EntityDictionaryBase:
+def dictionary_preprocess(dictionary: EntityDictionary) -> EntityDictionary:
     def preprocess_example(name: str, description: str) -> dict[str, list[int]]:
         text = name + " " + description
         encodings  = tokenizer(
@@ -192,7 +192,7 @@ class TestDenseRetriever:
                 tokenizer=tokenizer,
             )
         )
-        retriever.build_index("dense_test")
+        retriever.build_index("test_dense_index")
         loaded_retriever = DenseRetriever(
             dictionary=processed_dictionary,
             config=DenseRetriever.Config(
@@ -200,7 +200,7 @@ class TestDenseRetriever:
                 tokenizer=tokenizer,
             )
         )
-        loaded_retriever.build_index("dense_test")
+        loaded_retriever.build_index("test_dense_index")
         assert retriever.dictionary and loaded_retriever.dictionary
         assert retriever.meta_ids_to_keys == loaded_retriever.meta_ids_to_keys
         assert retriever.dictionary.id_to_index == loaded_retriever.dictionary.id_to_index

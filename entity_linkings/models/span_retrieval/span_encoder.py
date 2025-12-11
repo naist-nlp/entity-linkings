@@ -11,6 +11,9 @@ from entity_linkings.models.utils import get_pooler, load_model
 
 
 class SpanEncoderModelBase(nn.Module):
+    # to suppress an AttributeError when training
+    _keys_to_ignore_on_save = None
+
     def __init__(self, model_name_or_path: str, pooling: str = "mean", distance: str = "inner_product", temperature: float = 1.0) -> None:
         super().__init__()
 
@@ -121,8 +124,8 @@ class TextEmbeddingModel(SpanEncoderModelBase):
         self.encoder.resize_token_embeddings(new_num_tokens)
 
     def save_pretrained(self, save_directory: str) -> None:
-        json.dump(self.config, open(f"{save_directory}/encoder_config.json", "w"), indent=2, ensure_ascii=False)
         self.encoder.save_pretrained(save_directory)
+        json.dump(self.config, open(f"{save_directory}/encoder_config.json", "w"), indent=2, ensure_ascii=False)
 
     @classmethod
     def from_pretrained(cls, load_directory: str) -> "TextEmbeddingModel":
@@ -234,17 +237,15 @@ class DualBERTModel(SpanEncoderModelBase):
         self.candidate_encoder.resize_token_embeddings(new_num_tokens)
 
     def save_pretrained(self, save_directory: str) -> None:
-        json.dump(self.config, open(f"{save_directory}/encoder_config.json", "w"), indent=2, ensure_ascii=False)
         self.mention_encoder.save_pretrained(f"{save_directory}/context_model")
         self.candidate_encoder.save_pretrained(f"{save_directory}/candidate_model")
+        json.dump(self.config, open(f"{save_directory}/encoder_config.json", "w"), indent=2, ensure_ascii=False)
 
     @classmethod
     def from_pretrained(cls, load_directory: str) -> "DualBERTModel":
         config = json.load(open(f"{load_directory}/encoder_config.json", "r", encoding="utf-8"))
         config["model_name_or_path"] = config["model_name_or_path"]
         model = cls(**config)
-        print(load_directory)
-        print(config)
         model.mention_encoder = load_model(f"{load_directory}/context_model")
         model.candidate_encoder = load_model(f"{load_directory}/candidate_model")
         return model

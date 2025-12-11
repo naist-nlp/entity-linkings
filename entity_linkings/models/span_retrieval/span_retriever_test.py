@@ -1,3 +1,4 @@
+import tempfile
 from importlib.resources import files
 
 import pytest
@@ -6,7 +7,7 @@ from transformers.trainer_utils import TrainOutput
 
 import assets as test_data
 from entity_linkings import load_dataset, load_dictionary
-from entity_linkings.entity_dictionary.base import Entity
+from entity_linkings.data_utils.entity_dictionary import Entity
 from entity_linkings.trainer import TrainingArguments
 
 from .span_encoder import DualBERTModel, TextEmbeddingModel
@@ -100,24 +101,25 @@ class TestSpanEntityRetrieverForDualEncoder:
 
     def test_train(self) -> None:
         model = SpanEntityRetrievalForDualEncoder(dictionary=dictionary)
-        result = model.train(
-            train_dataset=dataset,
-            eval_dataset=dataset,
-            num_hard_negatives=2,
-            training_args=TrainingArguments(
-                output_dir="./test_output",
-                num_train_epochs=1,
-                per_device_train_batch_size=2,
-                per_device_eval_batch_size=2,
-                logging_strategy="no",
-                save_strategy="no",
-                eval_strategy="no",
-                remove_unused_columns=False,
-                eval_on_start=True
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = model.train(
+                train_dataset=dataset,
+                eval_dataset=dataset,
+                num_hard_negatives=2,
+                training_args=TrainingArguments(
+                    output_dir=tmpdir,
+                    num_train_epochs=1,
+                    per_device_train_batch_size=2,
+                    per_device_eval_batch_size=2,
+                    logging_strategy="no",
+                    save_strategy="no",
+                    eval_strategy="no",
+                    remove_unused_columns=False,
+                    eval_on_start=True
+                )
             )
-        )
-        assert isinstance(result, TrainOutput)
-        assert hasattr(result, 'metrics')
+            assert isinstance(result, TrainOutput)
+            assert hasattr(result, 'metrics')
 
     def test_evaluate(self) -> None:
         model = SpanEntityRetrievalForDualEncoder(dictionary=dictionary)

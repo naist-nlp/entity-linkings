@@ -10,11 +10,12 @@ from typing import Optional
 import numpy as np
 from datasets import DownloadManager
 
-from entity_linkings.entity_dictionary import EntityDictionaryBase
+from entity_linkings.data_utils import EntityDictionary
 
 from ..base import IndexerBase
 
 logger = getLogger(__name__)
+logger.setLevel("INFO")
 
 punc_remover = re.compile(r"[\W]+")
 
@@ -59,7 +60,7 @@ class ZeldaCandidateIndexer(IndexerBase):
     @dataclass
     class Config(IndexerBase.Config): ...
 
-    def __init__(self, dictionary: EntityDictionaryBase, config: Optional[Config] = None) -> None:
+    def __init__(self, dictionary: EntityDictionary, config: Optional[Config] = None) -> None:
         super().__init__(dictionary, config)
 
     def _initialize(self) -> None:
@@ -73,7 +74,7 @@ class ZeldaCandidateIndexer(IndexerBase):
             with open(os.path.join(data_dir, 'other', 'zelda_mention_entities_counter.pickle'), 'rb') as handle:
                 self.mention_entities_counter = pickle.load(handle)
                 self.meta_ids_to_keys = {entity["name"]: entity["id"] for entity in self.dictionary}
-                self.simpler_mentions_candidate_dict, self.even_more_simpler_mentions_candidate_dict = build_other_dictionaries(self.mention_entities_counter)
+        self.simpler_mentions_candidate_dict, self.even_more_simpler_mentions_candidate_dict = build_other_dictionaries(self.mention_entities_counter)
 
     def search_knn(self, query: str|list[str], top_k: int, ignore_ids: Optional[list[str]|list[list[str]]] = None) -> tuple[np.ndarray, list[list[str]]]:
         if top_k <= 0:
@@ -119,6 +120,7 @@ class ZeldaCandidateIndexer(IndexerBase):
                         candidate_ids[wiki_id] += v
 
                 num_mentions = sum(candidate_ids.values())
+                candidate_ids = {k: v for k, v in sorted(candidate_ids.items(), key=lambda item: item[1], reverse=True)}
                 candidate_scores = [c_count / num_mentions for c_count in candidate_ids.values()]
 
                 if len(candidate_ids) < top_k:
@@ -138,12 +140,8 @@ class ZeldaCandidateIndexer(IndexerBase):
     def load(self, index_path: str) -> None:
         logger.info("Deserializing index from %s", index_path)
         mention_entities_counter_file = os.path.join(index_path, "zelda_mention_entities_counter.pickle")
-        simpler_mentions_candidate_file = os.path.join(index_path, "zelda_simpler_mentions_candidate_dict.pickle")
-        even_more_simpler_mentions_candidate_file = os.path.join(index_path, "zelda_even_more_simpler_mentions_candidate_dict.pickle")
         meta_file = os.path.join(index_path, "meta_zelda_candidate_list.json")
         self.mention_entities_counter = pickle.load(open(mention_entities_counter_file, 'rb'))
-        self.simpler_mentions_candidate_dict = pickle.load(open(simpler_mentions_candidate_file, 'rb'))
-        self.even_more_simpler_mentions_candidate_dict = pickle.load(open(even_more_simpler_mentions_candidate_file, 'rb'))
         self.meta_ids_to_keys = json.load(open(meta_file))
         logger.info(
             "Loaded index of type %s and size %d", type(self.mention_entities_counter), len(self.meta_ids_to_keys)

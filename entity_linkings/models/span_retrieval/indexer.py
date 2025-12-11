@@ -12,8 +12,7 @@ from torch.utils.data import DataLoader, SequentialSampler
 from tqdm.auto import tqdm
 from transformers import PreTrainedTokenizerBase
 
-from entity_linkings.data_utils.collator import CollatorBase
-from entity_linkings.entity_dictionary import EntityDictionaryBase
+from entity_linkings.data_utils import CollatorBase, EntityDictionary
 from entity_linkings.models.span_retrieval.span_encoder import SpanEncoderModelBase
 
 from ..base import IndexerBase
@@ -32,7 +31,7 @@ class DenseRetriever(IndexerBase):
         use_hnsw: bool = False
         n_hubs: int = 10
 
-    def __init__(self, dictionary: EntityDictionaryBase, config: Optional[Config] = None) -> None:
+    def __init__(self, dictionary: EntityDictionary, config: Optional[Config] = None) -> None:
         super().__init__(dictionary, config)
         if self.config.model is None:
             raise ValueError("Model must be provided.")
