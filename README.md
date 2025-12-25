@@ -150,6 +150,8 @@ print("Score: ",  predictions[0][0]["score"])
 ```
 
 ## Available Models
+Please refer to the [link](https://colab.research.google.com/drive/1xin1LjNAM7b-Hs0THUbt_-ggj77vOohy?usp=sharing) for instructions on how to run each model.
+
 ### Candidate Retriever
 * BM25
 * ZELDA Candidate List ([Milich and Akbik., 2023](https://github.com/flairNLP/zelda))
@@ -238,6 +240,8 @@ If you want to use our packages with your custom ontologies, you need to convert
   * TACKBP-2010 ([Ji et al., 2011](https://blender.cs.illinois.edu/paper/kbp2011.pdf)): You must sign Text Analysis Conference (TAC) Knowledge Base Population Evaluation License Agreement.
   <!-- * ACE2004 ([Ratinov et al., 2011]()): You must sign the Linguistic Data Consortium (LDC) Licence Agreeement. -->
   <!-- * AQUAINT ([Milne and Witten, 2008](https://community.nzdl.org/wikification/)): AQUAINT consists 50 randomly selected arcles from the English portion of AQUAINT corpus, which is not publicly available. You can find the information [here](https://tac.nist.gov//data/data_desc.html) -->
+* Results for ZeshEL/ZELDA benchmarks (aida-b, tweeki, reddit-*, shadowlink-*, and wned-*) across all models can be found in [the Spreadsheet](https://docs.google.com/spreadsheets/d/1J3xOjhu47N64WkHLJJwP-6KbDB-Bklm0q2FRRqDUW9M/edit?usp=sharing).
+
 
 ### Custom Dataset
 If you want to use our packages with the your private dataset, you must convert it to the following format:
