@@ -6,8 +6,8 @@
 
 <p align="left">
 <a href="https://pypi.org/project/entity_linkings"><img alt="PyPi" src="https://img.shields.io/pypi/v/entity_linkings"></a>
-<a href="https://github.com/YuSawan/entity_linking_benchmark/blob/main/LICENSE"><img alt="GitHub" src="https://img.shields.io/github/license/YuSawan/entity_linkings"></a>
-<a href=""><img src="https://github.com/YuSawan/entity_linkings/actions/workflows/ci.yaml/badge.svg"></a>
+<a href="https://github.com/naist-nlp/entity_linking_benchmark/blob/main/LICENSE"><img alt="GitHub" src="https://img.shields.io/github/license/naist-nlp/entity_linkings"></a>
+<a href=""><img src="https://github.com/naist-nlp/entity_linkings/actions/workflows/ci.yaml/badge.svg"></a>
 </p>
 
 
