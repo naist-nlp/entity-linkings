@@ -38,7 +38,7 @@ jobs:
     - name: Set up Python ${{ matrix.python-version }}
       run: uv python install
     - name: Install the project
-      run: uv sync --all-extras --dev --index torch=https://download.pytorch.org/whl/cpu --index-strategy unsafe-best-match
+      run: uv sync --all-extras --dev
     - name: Install pip for spaCy
       run: uv pip install pip
     - name: Download spaCy model
