@@ -57,8 +57,7 @@ def write_yaml(output_path: str, content: dict) -> None:
 def generate_config(output_dir: str) -> None:
     os.makedirs(output_dir, exist_ok=True)
     retriever_ids = entity_linkings.get_retriever_ids()
-    el_ids = entity_linkings.get_el_ids()
-    ed_ids = entity_linkings.get_ed_ids()
+    reranker_ids = entity_linkings.get_reranker_ids()
 
     for model_id in retriever_ids:
         output_path = os.path.join(output_dir, f"{model_id}.yaml")
@@ -66,9 +65,9 @@ def generate_config(output_dir: str) -> None:
         model_config = model_cls.Config()
         write_yaml(output_path, {f"{model_id}": model_config.__dict__})
 
-    for model_id in el_ids + ed_ids:
+    for model_id in reranker_ids:
         output_path = os.path.join(output_dir, f"{model_id}.yaml")
-        model_cls = entity_linkings.get_models(model_id)
+        model_cls = entity_linkings.get_rerankers(model_id)
         model_config = model_cls.Config()
         write_yaml(output_path, {f"{model_id}": model_config.__dict__})
 

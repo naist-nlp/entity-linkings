@@ -1,7 +1,9 @@
 from importlib.resources import files
 
+from datasets import load_dataset
+
 import assets as test_data
-from entity_linkings import load_dataset, load_dictionary
+from entity_linkings import load_dictionary
 
 from .utils import (
     cut_context_window,
@@ -13,7 +15,7 @@ from .utils import (
 dataset_path = str(files(test_data).joinpath("dataset_toy.jsonl"))
 dictionary_path = str(files(test_data).joinpath("dictionary_toy.jsonl"))
 dictionary = load_dictionary(dictionary_path)
-dataset = load_dataset(data_files={"test": dataset_path})['test']
+dataset = load_dataset("json", data_files={"test": dataset_path})['test']
 
 def test_filter_nil_entities() -> None:
     filtered_dataset = filter_nil_entities(dataset, dictionary)

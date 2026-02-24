@@ -2,7 +2,9 @@ import logging
 import os
 from argparse import ArgumentParser, Namespace
 
-from entity_linkings import get_retrievers, load_dataset, load_dictionary
+from datasets import load_dataset
+
+from entity_linkings import get_retrievers, load_dictionary
 from entity_linkings.trainer import TrainingArguments
 from entity_linkings.utils import read_yaml
 
@@ -10,10 +12,14 @@ logger = logging.getLogger(__name__)
 
 
 def main(args: Namespace) -> None:
+    if args.gpus is not None:
+        os.environ["CUDA_VISIBLE_DEVICES"] = args.gpus
+
     dictionary = load_dictionary(args.dictionary_id_or_path, cache_dir=args.cache_dir)
     dataset_id = args.dataset_id if args.dataset_id else "json"
     if dataset_id != "json":
-        dataset = load_dataset(args.dataset_id, cache_dir=args.cache_dir)
+        dataset_id = dataset_id if dataset_id.startswith("naist-nlp/") else f"naist-nlp/{dataset_id}"
+        dataset = load_dataset(dataset_id, cache_dir=args.cache_dir)
     else:
         data_files = {"train": args.train_file}
         if args.validation_file:
@@ -32,9 +38,9 @@ def main(args: Namespace) -> None:
     else:
         model_config = {}
         training_config = {}
-
     if args.retriever_model_name_or_path is not None:
         model_config["model_name_or_path"] = args.retriever_model_name_or_path
+
     training_config["output_dir"] = args.output_dir
     training_config["num_train_epochs"] = args.num_train_epochs
     training_config["per_device_train_batch_size"] = args.train_batch_size
@@ -64,7 +70,7 @@ def main(args: Namespace) -> None:
         training_args.run_name = args.retriever_id
 
     retriever_cls = get_retrievers(args.retriever_id)
-    retriever = retriever_cls(dictionary, config=retriever_cls.Config(**model_config))
+    retriever = retriever_cls(dictionary, config=retriever_cls.Config(**model_config), index_path=args.retriever_index_dir)
     _ = retriever.train(
         train_dataset=dataset["train"],
         eval_dataset=dataset["validation"] if "validation" in dataset else None,
@@ -77,6 +83,8 @@ def cli_main() -> None:
     parser = ArgumentParser()
     parser.add_argument('--retriever_id', '-m', type=str, default=None, help='Name of the model to use.')
     parser.add_argument('--retriever_model_name_or_path', type=str, default=None, help='Name of the model to use.')
+    parser.add_argument('--retriever_index_dir', type=str, default=None, help='Path to the retriever index directory.')
+    parser.add_argument('--retriever_config', type=str, default=None, help='YAML-based config file.')
     parser.add_argument('--dictionary_id_or_path', '-d', type=str, default=None, help='Path to the entity dictionary file.')
     parser.add_argument('--dataset_id', '-D', type=str, default=None, help='Name of the dataset to use.')
     parser.add_argument('--train_file', type=str, default=None, help='Path to the training dataset file.')
@@ -89,7 +97,7 @@ def cli_main() -> None:
     parser.add_argument('--output_dir', type=str, required=True, help='Path to the output directory.')
     parser.add_argument('--remove_nil', action='store_true', default=False, help='Whether to remove nil entities from the dataset.')
     parser.add_argument('--cache_dir', type=str, default=None, help='Path to the cache directory.')
-    parser.add_argument('--retriever_config', type=str, default=None, help='YAML-based config file.')
+    parser.add_argument('--gpus', type=str, default=None, help='Comma-separated list of GPU device IDs to use.')
     parser.add_argument('--wandb', action='store_true', default=False, help='Whether to use wandb for logging.')
     args = parser.parse_args()
     main(args)

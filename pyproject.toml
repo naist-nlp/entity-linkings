@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 
 dependencies = [
-    "bm25s[full]>=0.2.14",
+    "bm25s>=0.2.14",
     "datasets>=4.0.0",
     "duckdb>=1.4.3",
     "faiss-cpu>=1.12.0",
@@ -16,7 +16,7 @@ dependencies = [
     "sentencepiece>=0.2.1",
     "spacy>=3.8.11",
     "tiktoken>=0.12.0",
-    "transformers[torch]>=4.55.4",
+    "transformers[torch](>=4.55.4,<5.0.0)",
 ]
 
 [dependency-groups]
@@ -37,15 +37,16 @@ omit = ["*_test.py"]
 testpaths = ["*_test.py"]
 filterwarnings = ["ignore::DeprecationWarning", "ignore::FutureWarning"]
 markers = [
-    "span_retrieval_dual_encoder: Test for SpanEntityRetrievalForDualEncoder",
-    "span_retrieval_text_embedding: Test for SpanEntityRetrievalForTextEmbedding",
-    "span_retrieval_bm25: Test for BM25",
-    "span_retrieval_e5bm25: Test for E5BM25",
-    "disambiguate_fevry: Test for FEVRY",
-    "disambiguate_blink: Test for BLINK",
-    "disambiguate_chatel: Test for ChatEL",
-    "disambiguate_fusioned: Test for FUSIONED",
-    "disambiguate_extend: Test for EXTEND",
+    "retriever_dual_encoder: Test for DualEncoder",
+    "retriever_text_embedding: Test for TextEmbedding",
+    "retriever_bm25: Test for BM25",
+    "retriever_prior: Test for PriorBasedRetriever",
+    "retriever_e5bm25: Test for E5BM25",
+    "reranker_fevry: Test for FEVRY",
+    "reranker_crossencoder: Test for Cross Encoder",
+    "reranker_chatel: Test for ChatEL",
+    "reranker_fusioned: Test for FUSIONED",
+    "reranker_extend: Test for EXTEND",
 ]
 
 [build-system]
@@ -56,9 +57,11 @@ build-backend = "hatchling.build"
 packages = ["entity_linkings"]
 
 [project.scripts]
-entitylinkings-train = "entity_linkings.cli.train:cli_main"
 entitylinkings-train-retrieval = "entity_linkings.cli.train_retrieval:cli_main"
-entitylinkings-eval = "entity_linkings.cli.evaluate:cli_main"
+entitylinkings-train-reranker = "entity_linkings.cli.train_reranker:cli_main"
 entitylinkings-eval-retrieval = "entity_linkings.cli.evaluate_retrieval:cli_main"
-entitylinkings-run = "entity_linkings.cli.run:cli_main"
+entitylinkings-eval-reranker = "entity_linkings.cli.evaluate_reranker:cli_main"
+entitylinkings-run-pipeline = "entity_linkings.cli.run:cli_main"
+entitylinkings-eval-pipeline = "entity_linkings.cli.evaluate_pipeline:cli_main"
+entitylinkings-build-index = "entity_linkings.cli.build_index:cli_main"
 entitylinkings-gen-config = "entity_linkings.cli.gen_default_config:cli_main"

@@ -1,0 +1,120 @@
+import logging
+import os
+from argparse import ArgumentParser, Namespace
+
+from datasets import load_dataset
+
+from entity_linkings import get_rerankers, get_retrievers, load_dictionary
+from entity_linkings.trainer import TrainingArguments
+from entity_linkings.utils import read_yaml
+
+logger = logging.getLogger(__name__)
+
+
+def main(args: Namespace) -> None:
+    if args.gpus is not None:
+        os.environ["CUDA_VISIBLE_DEVICES"] = args.gpus
+
+    dictionary = load_dictionary(args.dictionary_id_or_path, cache_dir=args.cache_dir)
+    dataset_id = args.dataset_id if args.dataset_id else "json"
+    if dataset_id != "json":
+        dataset_id = dataset_id if dataset_id.startswith("naist-nlp/") else f"naist-nlp/{dataset_id}"
+        dataset = load_dataset(dataset_id, cache_dir=args.cache_dir)
+    else:
+        data_files = {"train": args.train_file}
+        if args.validation_file:
+            data_files["validation"] = args.validation_file
+        dataset = load_dataset("json", data_files=data_files, cache_dir=args.cache_dir)
+    if args.remove_nil:
+        from entity_linkings.data_utils import filter_nil_entities
+        dataset["train"] = filter_nil_entities(dataset["train"], dictionary)
+        if "validation" in dataset:
+            dataset["validation"] = filter_nil_entities(dataset["validation"], dictionary)
+
+    if args.retriever_config is not None:
+        retriever_config = read_yaml(args.retriever_config)[args.retriever_id.lower()]
+    else:
+        retriever_config = {}
+    if args.retriever_model_name_or_path is not None:
+        retriever_config["model_name_or_path"] = args.retriever_model_name_or_path
+
+    if args.reranker_config is not None:
+        all_config = read_yaml(args.reranker_config)
+        model_config = all_config[args.reranker_id.lower()]
+        training_config = all_config["training_arguments"]
+    else:
+        model_config = {}
+        training_config = {}
+    if args.reranker_model_name_or_path is not None:
+        model_config["model_name_or_path"] = args.reranker_model_name_or_path
+
+    training_config["output_dir"] = args.output_dir
+    training_config["num_train_epochs"] = args.num_train_epochs
+    training_config["per_device_train_batch_size"] = args.train_batch_size
+    training_config["per_device_eval_batch_size"] = args.validation_batch_size
+    training_config["gradient_accumulation_steps"] = args.gradient_accumulation_steps
+
+    training_args = TrainingArguments(**training_config)
+    if "validation" not in dataset:
+        training_args.eval_strategy = 'no'
+        training_args.save_strategy = 'no'
+
+    if args.wandb:
+        import wandb
+        wandb.init(
+            project=os.environ.get("WANDB_PROJECT", "entity_linkings"),
+            name=args.reranker_id, tags=["training"]
+        )
+        wandb.log({
+            "retriever_id": args.retriever_id,
+            "reranker_model_name_or_path": args.reranker_model_name_or_path,
+            "retriever_model_name_or_path": args.retriever_model_name_or_path,
+            "dictionary_id_or_path": args.dictionary_id_or_path,
+            "dataset_id": dataset_id,
+            "remove_nil": args.remove_nil,
+            "num_candidates": args.num_candidates,
+        })
+        training_args.report_to = ["wandb"]
+
+    retriever_cls = get_retrievers(args.retriever_id)
+    retriever = retriever_cls(dictionary, config=retriever_cls.Config(**retriever_config), index_path=args.retriever_index_dir)
+
+    model_cls = get_rerankers(args.reranker_id)
+    model = model_cls(retriever, config=model_cls.Config(**model_config))
+    _ = model.train(
+        train_dataset=dataset["train"],
+        eval_dataset=dataset["validation"] if "validation" in dataset else None,
+        num_candidates=args.num_candidates,
+        training_args=training_args,
+    )
+
+
+def cli_main() -> None:
+    parser = ArgumentParser()
+    parser.add_argument('--retriever_id', type=str, required=True, help='Name of the retriever model to use.')
+    parser.add_argument('--retriever_model_name_or_path', type=str, default=None, help='Name of the retriever model to use.')
+    parser.add_argument('--retriever_index_dir', type=str, default=None, help='Path to the retriever index directory.')
+    parser.add_argument('--retriever_config', type=str, default=None, help='YAML-based retriever config file.')
+    parser.add_argument('--reranker_id', type=str, required=True, help='Name of the model to use.')
+    parser.add_argument('--reranker_model_name_or_path', type=str, default=None, help='Name of the model to use.')
+    parser.add_argument('--reranker_config', type=str, default=None, help='YAML-based config file.')
+    parser.add_argument('--dictionary_id_or_path', '-d', type=str, default=None, help='Path to the entity dictionary file.')
+    parser.add_argument('--dataset_id', '-D', type=str, default=None, help='Name of the dataset to use.')
+    parser.add_argument('--train_file', type=str, default=None, help='Path to the training dataset file.')
+    parser.add_argument('--validation_file', type=str, default=None, help='Path to the validation dataset file.')
+    parser.add_argument('--num_candidates', type=int, default=64, help='Number of candidate entities to consider during training.')
+    parser.add_argument('--num_train_epochs', type=int, default=5, help='Number of training epochs.')
+    parser.add_argument('--train_batch_size', type=int, default=8, help='Training batch size.')
+    parser.add_argument('--validation_batch_size', type=int, default=8, help='Validation batch size.')
+    parser.add_argument('--gradient_accumulation_steps', type=int, default=1, help='Number of gradient accumulation steps.' )
+    parser.add_argument('--output_dir', type=str, required=True, help='Path to the output directory.')
+    parser.add_argument('--remove_nil', action='store_true', default=False, help='Whether to remove nil entities from the dataset.')
+    parser.add_argument('--cache_dir', type=str, default=None, help='Path to the cache directory.')
+    parser.add_argument('--gpus', type=str, default=None, help='Comma-separated list of GPU device IDs to use.')
+    parser.add_argument('--wandb', action='store_true', default=False, help='Whether to use Weights & Biases for logging.')
+    args = parser.parse_args()
+    main(args)
+
+
+if __name__ == "__main__":
+    cli_main()

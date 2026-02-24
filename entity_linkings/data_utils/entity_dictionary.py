@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Iterator, Optional, TypedDict
 
 import datasets
-from datasets import Column, Dataset
+from datasets import Dataset
 from transformers import TrainingArguments
 
 
@@ -83,14 +83,14 @@ class EntityDictionary(abc.ABC):
             nil_index = self.title_to_index[self.nil_name]
             return self.entity_dict[nil_index]
 
-    def get_entity_ids(self) -> Column:
-        return self.entity_dict["id"]
+    def get_entity_ids(self) -> list[str]:
+        return list(self.entity_dict["id"])
 
-    def get_entity_names(self) -> Column:
-        return self.entity_dict["name"]
+    def get_entity_names(self) -> list[str]:
+        return list(self.entity_dict["name"])
 
-    def get_entity_descriptions(self) -> Column:
-        return self.entity_dict["description"]
+    def get_entity_descriptions(self) -> list[str]:
+        return list(self.entity_dict["description"])
 
     def convert_description(self, name: str, description: Optional[str] = None) -> str:
         if description:

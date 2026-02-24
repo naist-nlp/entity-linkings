@@ -1,14 +1,6 @@
-from .collator import (
-    CollatorBase,
-    CollatorForCrossEncoder,
-    # CollatorForReader,
-    CollatorForExtend,
-    CollatorForFusioned,
-    CollatorForReranking,
-    CollatorForRetrieval,
-    # CollatorForSentenceRetrieval,
-)
+from .collator import CollatorBase
 from .entity_dictionary import EntityDictionary
+from .preprocessor import Preprocessor, preprocess
 from .utils import (
     cut_context_window,
     filter_nil_entities,
@@ -18,16 +10,11 @@ from .utils import (
 
 __all__ = [
     "CollatorBase",
-    "CollatorForRetrieval",
-    # "CollatorForSentenceRetrieval",
-    "CollatorForExtend",
-    "CollatorForReranking",
-    "CollatorForCrossEncoder",
-    "CollatorForFusioned",
-    # "CollatorForReader",
     "EntityDictionary",
     "filter_nil_entities",
     "cut_context_window",
     "sample_range_excluding",
     "truncate_around_mention",
+    "preprocess",
+    "Preprocessor",
 ]

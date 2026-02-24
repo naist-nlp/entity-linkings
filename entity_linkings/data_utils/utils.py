@@ -49,6 +49,9 @@ def truncate_around_mention(
     ent_start_idx: int,
     ent_end_idx: int
 ) -> tuple[list[int], int, int]:
+    if len(tokens_ids) <= max_token_length:
+        return tokens_ids, ent_start_idx, ent_end_idx
+
     # Compute window around mention
     mention_center = (ent_start_idx + ent_end_idx) // 2
     half_window = max_token_length // 2
@@ -72,5 +75,6 @@ def truncate_around_mention(
 
     new_ent_start_idx = max(0, ent_start_idx - left)
     new_ent_end_idx = min(len(truncated_text_tokens), ent_end_idx - left)
+    assert len(truncated_text_tokens) <= max_token_length
 
     return truncated_text_tokens, new_ent_start_idx, new_ent_end_idx

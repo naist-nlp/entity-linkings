@@ -1,6 +1,6 @@
 from importlib.resources import files
 
-from datasets import Column, load_dataset
+from datasets import load_dataset
 
 import assets as test_data
 from entity_linkings import load_dictionary
@@ -27,13 +27,13 @@ class TestEntityDictionary:
     def test_get_entity_ids(self) -> None:
         dictionary = load_dictionary(dictionary_path)
         ids = dictionary.get_entity_ids()
-        assert isinstance(ids, Column)
+        assert isinstance(ids, list)
         assert ids == ["000011", "000012", "000013", "000014", "000015", "-1"]
 
     def test_get_entity_names(self) -> None:
         dictionary = load_dictionary(dictionary_path)
         names = dictionary.get_entity_names()
-        assert isinstance(names, Column)
+        assert isinstance(names, list)
         assert len(names) == len(dictionary)
         assert names[0] == "Google"
         assert names[1] == "Apple"
@@ -45,7 +45,7 @@ class TestEntityDictionary:
     def test_get_entity_descriptions(self) -> None:
         dictionary = load_dictionary(dictionary_path)
         descriptions = dictionary.get_entity_descriptions()
-        assert isinstance(descriptions, Column)
+        assert isinstance(descriptions, list)
         assert len(descriptions) == len(dictionary)
         assert descriptions[0] == "Google is a global company"
         assert descriptions[1] == "Apple is a global company"

@@ -1,0 +1,30 @@
+{
+    "Apple": {
+        "Apple": 12,
+        "Apple River (Illinois)": 1
+    },
+    "Microsoft": {
+        "Microsoft": 12,
+        "Microsoft Bing": 1
+    },
+    "Google": {
+        "Google": 12,
+        "Google Search": 1
+    },
+    "Facebook": {
+        "Facebook": 12,
+        "Meta": 10
+    },
+    "Amazon": {
+        "Amazon": 12,
+        "Amazonas (Brazilian state)": 1
+    },
+    "Toyota": {
+        "Toyota": 12,
+        "Toyota RAV4": 1
+    },
+    "Sony": {
+        "Sony": 12,
+        "Sony Pictures Animation": 1
+    }
+}

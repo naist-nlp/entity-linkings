@@ -18,15 +18,15 @@ jobs:
         python-version: ["3.11", "3.12", "3.13"]
         pytest_marker:
           - null
-          - "span_retrieval_dual_encoder"
-          - "span_retrieval_text_embedding"
-          - "span_retrieval_bm25"
-          - "span_retrieval_e5bm25"
-          - "disambiguate_fevry"
-          - "disambiguate_blink"
-          - "disambiguate_chatel"
-          - "disambiguate_fusioned"
-          - "disambiguate_extend"
+          # - "retriever_dual_encoder"
+          # - "retriever_text_embedding"
+          # - "retriever_bm25"
+          # - "retriever_e5bm25"
+          # - "reranker_fevry"
+          # - "reranker_blink"
+          # - "reranker_chatel"
+          # - "reranker_fusioned"
+          # - "reranker_extend"
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -39,6 +39,10 @@ jobs:
       run: uv python install
     - name: Install the project
       run: uv sync --all-extras --dev --index torch=https://download.pytorch.org/whl/cpu --index-strategy unsafe-best-match
+    - name: Install pip for spaCy
+      run: uv pip install pip
+    - name: Download spaCy model
+      run: uv run -- spacy download en_core_web_sm
     - name: Test with pytest
       run: |
         uv run pytest ${{ matrix.pytest_marker && format('-m {0}', matrix.pytest_marker) || '' }}

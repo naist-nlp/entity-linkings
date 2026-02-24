@@ -4,8 +4,9 @@ import os
 from argparse import ArgumentParser, Namespace
 
 import torch
+from datasets import load_dataset
 
-from entity_linkings import get_retrievers, load_dataset, load_dictionary
+from entity_linkings import get_retrievers, load_dictionary
 from entity_linkings.utils import read_yaml
 
 logger = logging.getLogger(__name__)
@@ -16,6 +17,7 @@ def evaluate(args: Namespace) -> None:
     dictionary = load_dictionary(args.dictionary_id_or_path, cache_dir=args.cache_dir)
     dataset_id = args.dataset_id if args.dataset_id else "json"
     if dataset_id != "json":
+        dataset_id = dataset_id if dataset_id.startswith("naist-nlp/") else f"naist-nlp/{dataset_id}"
         test_dataset = load_dataset(dataset_id, split='test', cache_dir=args.cache_dir)
     else:
         test_dataset = load_dataset("json", data_files={"test": args.test_file}, cache_dir=args.cache_dir)['test']
@@ -45,7 +47,7 @@ def evaluate(args: Namespace) -> None:
         retriever_config["model_name_or_path"] = args.retriever_model_name_or_path
 
     retriever_cls = get_retrievers(args.retriever_id)
-    model = retriever_cls(dictionary=dictionary, config=retriever_cls.Config(**retriever_config))
+    model = retriever_cls(dictionary=dictionary, config=retriever_cls.Config(**retriever_config), index_path=args.retriever_index_dir)
     metrics = model.evaluate(test_dataset, batch_size=args.test_batch_size)
     logger.info(f"Evaluation results: {metrics}")
     if args.output_dir is not None:
@@ -63,6 +65,8 @@ def cli_main() -> None:
     parser = ArgumentParser()
     parser.add_argument('--retriever_id', type=str, required=True, help='Name of the retriever model to use.')
     parser.add_argument('--retriever_model_name_or_path', type=str, default=None, help='Name of the model to use.')
+    parser.add_argument('--retriever_index_dir', type=str, default=None, help='Path to the retriever index directory.')
+    parser.add_argument('--retriever_config', type=str, default=None, help='YAML-based config file.')
     parser.add_argument('--dictionary_id_or_path', type=str, default=None, help='Path to the entity dictionary file.')
     parser.add_argument('--dataset_id', type=str, default=None, help='Name of the dataset to use.')
     parser.add_argument('--test_file', type=str, default=None, help='Path to the dataset file.')
@@ -70,7 +74,6 @@ def cli_main() -> None:
     parser.add_argument('--remove_nil', action='store_true', default=False, help='Whether to remove nil entities from the dataset.')
     parser.add_argument('--output_dir', type=str, default=None, help='Path to the output directory.')
     parser.add_argument("--cache_dir", type=str, default=None, help='Path to the cache directory.')
-    parser.add_argument('--retriever_config', type=str, default=None, help='YAML-based config file.')
     parser.add_argument('--wandb', action='store_true', default=False, help='Whether to use wandb for logging.')
     args = parser.parse_args()
     evaluate(args)

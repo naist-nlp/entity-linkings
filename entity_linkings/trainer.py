@@ -5,24 +5,11 @@ from typing import Any, Optional, Union
 import torch
 import torch.nn as nn
 import transformers
-from transformers.trainer import Trainer
+from transformers import Trainer
 from transformers.trainer_pt_utils import nested_detach
-from transformers.utils import (
-    is_accelerate_available,
-    is_sagemaker_mp_enabled,
-    is_torch_xla_available,
-)
 
 logger = logging.getLogger(__name__)
-
-if is_sagemaker_mp_enabled():
-    pass
-
-if is_torch_xla_available():
-    pass
-
-if is_accelerate_available():
-    pass
+logger.setLevel(logging.INFO)
 
 
 @dataclass
@@ -81,11 +68,11 @@ class EntityLinkingTrainer(Trainer):
         else:
             labels = None
 
-        if self.model_accepts_loss_kwargs:
-            kwargs = {}
-            if num_items_in_batch is not None:
-                kwargs["num_items_in_batch"] = num_items_in_batch
-            inputs = {**inputs, **kwargs}
+        # if self.model_accepts_loss_kwargs:
+            # kwargs = {}
+            # if num_items_in_batch is not None:
+            #     kwargs["num_items_in_batch"] = num_items_in_batch
+            # inputs = {**inputs, **kwargs}
 
         # User-defined compute_loss function
         if self.compute_loss_func is not None:
@@ -149,22 +136,47 @@ class EntityLinkingTrainer(Trainer):
             Tuple[Optional[torch.Tensor], Optional[torch.Tensor], Optional[torch.Tensor]]: A tuple with the loss,
             logits and labels (each being optional).
         """
-        labels = inputs.get("labels")
+        has_labels = False if len(self.label_names) == 0 else all(inputs.get(k) is not None for k in self.label_names)
+
         inputs = self._prepare_inputs(inputs)
         if ignore_keys is None:
-            ignore_keys = []
+            if hasattr(self.model, "config"):
+                ignore_keys = getattr(self.model.config, "keys_to_ignore_at_inference", ["past_key_values"])
+            else:
+                ignore_keys = []
+
+        # labels may be popped when computing the loss (label smoothing for instance) so we grab them first.
+        if has_labels:
+            labels = nested_detach(tuple(inputs.get(name) for name in self.label_names))
+            if len(labels) == 1:
+                labels = labels[0]
+        else:
+            labels = None
 
         with torch.no_grad():
-            loss = None
-            with self.compute_loss_context_manager():
-                outputs = self.compute_loss(model, inputs, return_outputs=True)
-            if isinstance(outputs, dict):
-                logits = tuple(v for k, v in outputs.items() if k not in ignore_keys)
+            if has_labels:
+                with self.compute_loss_context_manager():
+                    num_items_in_batch = self._get_num_items_in_batch([inputs], self.args.device)
+                    loss, outputs = self.compute_loss(
+                        model, inputs, return_outputs=True, num_items_in_batch=num_items_in_batch
+                    )
+                loss = loss.detach().mean()
+
+                if isinstance(outputs, dict):
+                    logits = tuple(v for k, v in outputs.items() if k not in ignore_keys + ["loss"])
+                else:
+                    logits = outputs[1:]
             else:
-                logits = outputs
-            # TODO: this needs to be fixed and made cleaner later.
-            if self.args.past_index >= 0:
-                self._past = outputs[self.args.past_index - 1]
+                loss = None
+                with self.compute_loss_context_manager():
+                    outputs = model(**inputs)
+                if isinstance(outputs, dict):
+                    logits = tuple(v for k, v in outputs.items() if k not in ignore_keys)
+                else:
+                    logits = outputs
+                # TODO: this needs to be fixed and made cleaner later.
+                if self.args.past_index >= 0:
+                    self._past = outputs[self.args.past_index - 1]
 
         if prediction_loss_only:
             return (loss, None, None)
