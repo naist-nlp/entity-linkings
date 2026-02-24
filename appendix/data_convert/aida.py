@@ -55,9 +55,9 @@ def read_tsv_file(file_path: str) -> dict[str, list[dict]]:
             for ent in d['entities']:
                 start = ent['start'] + cumsum_lengths[i]
                 end = ent['end'] + cumsum_lengths[i]
-                title = "-1" if ent['title'] == ['--NME--'] else ent['title']
+                title = ["-1"] if ent['title'] == ['--NME--'] else ent['title']
                 assert context[start:end] == ent["text"]
-                entities.append({"start": start, "end": end, "label": [title]})
+                entities.append({"start": start, "end": end, "label": title})
         example = {
             "id": id,
             "text": context,

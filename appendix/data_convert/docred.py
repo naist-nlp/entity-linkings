@@ -73,7 +73,6 @@ def _convert(output_dir: str, finder: WikiMapper, source: str) -> None:
 
 
 def main(finder: WikiMapper, output_dir: str) -> None:
-    os.makedirs(output_dir, exist_ok=True)
     _convert(output_dir, finder, source="wikipedia")
     _convert(output_dir, finder, source="wikidata")
 

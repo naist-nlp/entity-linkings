@@ -81,7 +81,7 @@ def _convert(
 def convert_csv_gz(input_path: str, finder: Optional[WikiMapper] = None) -> Iterator[tuple[str, list[dict[str, str]]]]:
     with open(input_path, 'rt', encoding='utf-8') as f:
         df = pd.read_csv(f)[['words', 'tags', 'word_list', 'wiki_list']]
-        pbar = tqdm(total=len(df), desc=f"Processing {os.path.basename(input_path)}")
+        pbar = tqdm(total=len(df), desc="Processing csv.gz")
         for _, row in df.iterrows():
             pbar.update()
             words = ast.literal_eval(row['words'])
@@ -110,12 +110,14 @@ def convert_jsonl(input_path: str, finder: Optional[WikiMapper] = None) -> Itera
                 page_id = "-1"
                 if finder is not None:
                     res = finder.find_by_title(title.strip())
-                    page_id = res["page_id"] if res is not None and res["page_id"] is not None else "-1"
+                    page_id = res["page_id"] if res is not None else "-1"
 
                 if page_id == "-1" and finder is not None:
                     res = finder.find_by_wikidata_id(qid.strip())
-                    page_id = res["page_id"] if res is not None and res["page_id"] is not None else "-1"
+                    assert len(res) <= 1
+                    page_id = res[0]["page_id"] if len(res) == 1 else "-1"
 
+                assert isinstance(page_id, str)
                 if page_id == "-1":
                     print(f"Warning: '{title}'({qid}) not found in wiki_map database.")
 
@@ -128,13 +130,12 @@ def convert_jsonl(input_path: str, finder: Optional[WikiMapper] = None) -> Itera
             yield sentence, entities
 
 
-def main(finder: WikiMapper, output_dir: str) -> None:
-    output_dir_data = os.path.join(output_dir, 'tweeki')
-    os.makedirs(output_dir_data, exist_ok=True)
-    print(f"Output directory data: {output_dir_data}")
+def convert(output_dir: str, finder: Optional[WikiMapper] = None) -> None:
+    os.makedirs(output_dir, exist_ok=True)
+    print(f"Output directory data: {output_dir}")
 
     uid = map(str, itertools.count(start=0, step=1))
-    with open(os.path.join(output_dir_data, "train.jsonl"), 'w', encoding='utf-8') as f:
+    with open(os.path.join(output_dir, "train.jsonl"), 'w', encoding='utf-8') as f:
         for url in _URLs['train']:
             data_path = DownloadManager().download_and_extract(url)
             for text, entities in convert_csv_gz(data_path, finder):
@@ -146,7 +147,7 @@ def main(finder: WikiMapper, output_dir: str) -> None:
                 }, ensure_ascii=False) + '\n')
 
     uid = map(str, itertools.count(start=0, step=1))
-    with open(os.path.join(output_dir_data, "test.jsonl"), 'w', encoding='utf-8') as f:
+    with open(os.path.join(output_dir, "test.jsonl"), 'w', encoding='utf-8') as f:
         for url in _URLs['test']:
             data_path = DownloadManager().download_and_extract(url)
             for text, entities in convert_jsonl(data_path, finder):
@@ -156,6 +157,14 @@ def main(finder: WikiMapper, output_dir: str) -> None:
                     "text": text,
                     "entities": entities
                 }, ensure_ascii=False) + '\n')
+
+
+def main(finder: WikiMapper, output_dir: str) -> None:
+    output_dir_data = os.path.join(output_dir, 'tweeki')
+    os.makedirs(output_dir_data, exist_ok=True)
+
+    convert(os.path.join(output_dir_data, 'wikidata'))
+    convert(os.path.join(output_dir_data, 'wikipedia'), finder)
 
 
 if __name__ == "__main__":

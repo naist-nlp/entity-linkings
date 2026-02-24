@@ -36,7 +36,7 @@ def parse_annotation(file_path: str, finder: WikiMapper) -> list[dict[str, Any]]
                 raise ValueError("Missing required annotation fields.")
 
             res = finder.find_by_title(wikilink.split('/')[-1].strip())
-            page_id = res["page_id"] if res is not None and res["page_id"] is not None else "-1"
+            page_id = str(res["page_id"]) if res is not None and res["page_id"] is not None else "-1"
 
             entities.append({
                 "start": int(start),
