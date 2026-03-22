@@ -60,8 +60,8 @@ class MentionPriorIndexer(IndexerBase):
         super().__init__(dictionary)
         self.mention_counter_path = mention_counter_path
 
-    def build_index(self, index_path: Optional[str] = None) -> None:
-        if index_path is not None and os.path.exists(os.path.join(index_path, "mention_entities_counter.pickle")):
+    def build_index(self, index_path: str) -> None:
+        if os.path.exists(os.path.join(index_path, "mention_entities_counter.pickle")):
             logger.info(f"Loading existing index from {index_path}")
             self.load(index_path=index_path)
         else:

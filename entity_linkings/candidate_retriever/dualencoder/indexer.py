@@ -58,8 +58,8 @@ class DenseRetriever(IndexerBase):
                 self.index = faiss.IndexFlatL2(self.vector_size)
 
     @torch.no_grad()
-    def build_index(self, index_path: Optional[str] = None) -> None:
-        if index_path and os.path.exists(os.path.join(index_path, "index.dpr")) and os.path.exists(os.path.join(index_path, "meta.json")):
+    def build_index(self, index_path: str) -> None:
+        if os.path.exists(os.path.join(index_path, "index.dpr")) and os.path.exists(os.path.join(index_path, "meta.json")):
             logger.info(f"Loading index from {index_path}")
             self.load(index_path)
         else:

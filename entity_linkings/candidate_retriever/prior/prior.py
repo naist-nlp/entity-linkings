@@ -23,9 +23,10 @@ class PRIOR(RetrieverBase):
 
     def __init__(self, dictionary: EntityDictionary, config: Optional[Config] = None, index_path: Optional[str] = None) -> None:
         super().__init__(dictionary, config)
-        self.retriever = self.create_retriever(index_path=index_path)
+        if index_path is not None:
+            self.retriever = self.create_retriever(index_path=index_path)
 
-    def create_retriever(self, index_path: Optional[str] = None) -> MentionPriorIndexer:
+    def create_retriever(self, index_path: str) -> MentionPriorIndexer:
         retriever = MentionPriorIndexer(dictionary=self.dictionary, mention_counter_path=self.config.model_name_or_path)
         retriever.build_index(index_path=index_path)
         return retriever

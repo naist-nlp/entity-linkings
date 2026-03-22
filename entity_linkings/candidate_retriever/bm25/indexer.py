@@ -65,8 +65,8 @@ class BM25Indexer(IndexerBase):
         self.index = BM25HF()
         self.meta_ids_to_keys: dict[int, str] = {}
 
-    def build_index(self, index_path: Optional[str] = None) -> None:
-        if index_path and os.path.exists(os.path.join(index_path, "meta_bm25.json")):
+    def build_index(self, index_path: str) -> None:
+        if os.path.exists(os.path.join(index_path, "meta_bm25.json")):
             self.load(index_path)
         else:
             self._initialize()

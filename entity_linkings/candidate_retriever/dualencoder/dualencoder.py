@@ -99,9 +99,10 @@ class DUALENCODER(RetrieverBase):
             self.config.max_candidate_length, self.config.context_window_chars
         )
         self.dictionary = self.preprocessor.dictionary_preprocess(self.dictionary)
-        self.retriever = self.create_retriever(index_path=index_path)
+        if index_path is not None:
+            self.retriever = self.create_retriever(index_path=index_path)
 
-    def create_retriever(self, index_path: Optional[str] = None) -> DenseRetriever:
+    def create_retriever(self, index_path: str) -> DenseRetriever:
         retriever = DenseRetriever(
             dictionary=self.dictionary,
             model=self.encoder,

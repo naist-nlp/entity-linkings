@@ -67,4 +67,5 @@ class TEXTEMBEDDING(DUALENCODER):
             self.config.max_candidate_length, self.config.context_window_chars
         )
         self.dictionary = self.preprocessor.dictionary_preprocess(self.dictionary)
-        self.retriever = self.create_retriever(index_path=index_path)
+        if index_path is not None:
+            self.retriever = self.create_retriever(index_path=index_path)

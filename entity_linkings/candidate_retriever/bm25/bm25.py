@@ -29,9 +29,10 @@ class BM25(RetrieverBase):
 
     def __init__(self, dictionary: EntityDictionary, config: Optional[Config] = None, index_path: Optional[str] = None) -> None:
         super().__init__(dictionary, config)
-        self.retriever = self.create_retriever(index_path=index_path)
+        if index_path is not None:
+            self.retriever = self.create_retriever(index_path=index_path)
 
-    def create_retriever(self, index_path: Optional[str] = None) -> BM25Indexer:
+    def create_retriever(self, index_path: str) -> BM25Indexer:
         retriever =  BM25Indexer(
             dictionary=self.dictionary,
             language=self.config.language,

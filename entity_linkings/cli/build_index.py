@@ -19,7 +19,8 @@ def build_index(args: Namespace) -> None:
 
     retriever_cls = get_retrievers(args.retriever_id)
     model = retriever_cls(dictionary=dictionary, config=retriever_cls.Config(**retriever_config))
-    model.retriever.save_index(args.output_dir, ensure_ascii=False)
+    retriever = model.create_retriever()
+    retriever.save_index(args.output_dir, ensure_ascii=False)
 
 
 def cli_main() -> None:

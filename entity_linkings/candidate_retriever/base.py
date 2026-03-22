@@ -49,7 +49,7 @@ class RetrieverBase(abc.ABC):
         self.dictionary = dictionary
         self.config = config if config is not None else self.Config()
 
-    def create_retriever(self, index_path: Optional[str] = None) -> IndexerBase:
+    def create_retriever(self, index_path: str) -> IndexerBase:
         raise NotImplementedError
 
     def train(self, train_dataset: Dataset, eval_dataset: Optional[Dataset] = None, num_hard_negatives: int = 0, training_args: Optional[TrainingArguments] = None) -> dict[str, float]:
