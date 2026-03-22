@@ -23,16 +23,19 @@ class PRIOR(RetrieverBase):
 
     def __init__(self, dictionary: EntityDictionary, config: Optional[Config] = None, index_path: Optional[str] = None) -> None:
         super().__init__(dictionary, config)
-        if index_path is not None:
-            self.retriever = self.create_retriever(index_path=index_path)
+        self.indexer = self.create_indexer(index_path=index_path)
 
-    def create_retriever(self, index_path: str) -> MentionPriorIndexer:
-        retriever = MentionPriorIndexer(dictionary=self.dictionary, mention_counter_path=self.config.model_name_or_path)
-        retriever.build_index(index_path=index_path)
-        return retriever
+    def create_indexer(self, index_path: str | None = None) -> MentionPriorIndexer:
+        indexer = MentionPriorIndexer(dictionary=self.dictionary, mention_counter_path=self.config.model_name_or_path)
+        indexer.build_index(index_path=index_path)
+        return indexer
 
     def evaluate(self, dataset: Dataset, **args: int) -> dict[str, float]:
-        pbar = tqdm(total=(len(dataset)), desc='Predict')
+        if not hasattr(self, "indexer"):
+            logger.warning("Indexer not found. Creating indexer with default settings. This may take some time if the index is large.")
+            self.indexer = self.create_indexer(index_path=None)
+
+        pbar = tqdm(total=(len(dataset)), desc='Evaluate')
         predictions = []
         for example in dataset:
             pbar.update()
@@ -46,7 +49,7 @@ class PRIOR(RetrieverBase):
                 labels.append(ent_labels)
             if len(queries) == 0:
                 continue
-            _, batch_indices = self.retriever.search_knn(queries, top_k=100)
+            _, batch_indices = self.indexer.search_knn(queries, top_k=100)
             for i, indices in enumerate(batch_indices):
                 preds = [{"id": self.dictionary(inds)["id"]} for inds in indices]
                 predictions.append({"gold": labels[i], "predict": preds})
@@ -55,13 +58,16 @@ class PRIOR(RetrieverBase):
         return metric
 
     def predict(self, sentence: str, spans: Optional[list[tuple[int, int]]] = None, top_k: int = 5) -> list[list[BaseSystemOutput]]:
+        if not hasattr(self, "indexer"):
+            logger.warning("Indexer not found. Creating indexer with default settings. This may take some time if the index is large.")
+            self.indexer = self.create_indexer(index_path=None)
         if not spans:
             raise ValueError("Spans must be provided for PRIOR prediction.")
 
         queries = []
         for b, e in spans:
             queries.append(sentence[b:e])
-        _, indices = self.retriever.search_knn(queries, top_k=top_k)
+        _, indices = self.indexer.search_knn(queries, top_k=top_k)
         all_result = []
         for i, (b, e) in enumerate(spans):
             result = []
@@ -73,6 +79,10 @@ class PRIOR(RetrieverBase):
         return all_result
 
     def retrieve_candidates(self, dataset: Dataset, top_k: int = 5, only_negative: bool = False, batch_size: int = 32, **args: int) -> list[list[str]]:
+        if not hasattr(self, "indexer"):
+            logger.warning("Indexer not found. Creating indexer with default settings. This may take some time if the index is large.")
+            self.indexer = self.create_indexer(index_path=None)
+
         all_candidates, queries, labels = [], [], []
         pbar = tqdm(total=(len(dataset)), desc='Retrieve candidates')
         for example in dataset:
@@ -82,11 +92,11 @@ class PRIOR(RetrieverBase):
                 queries.append(text[ent["start"]: ent["end"]])
                 labels.append(ent['label'])
             if len(queries) >= batch_size:
-                _, batch_indices = self.retriever.search_knn(queries, top_k=top_k, ignore_ids=labels if only_negative else None)
+                _, batch_indices = self.indexer.search_knn(queries, top_k=top_k, ignore_ids=labels if only_negative else None)
                 all_candidates.extend(batch_indices)
                 queries, labels = [], []
         if len(queries) > 0:
-            _, batch_indices = self.retriever.search_knn(queries, top_k=top_k, ignore_ids=labels if only_negative else None)
+            _, batch_indices = self.indexer.search_knn(queries, top_k=top_k, ignore_ids=labels if only_negative else None)
             all_candidates.extend(batch_indices)
         pbar.close()
         return all_candidates

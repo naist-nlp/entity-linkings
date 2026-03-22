@@ -19,7 +19,7 @@ from .encoder import DualBERTModel
 logger = getLogger(__name__)
 
 
-class DenseRetriever(IndexerBase):
+class FaissIndexer(IndexerBase):
     def __init__(
         self,
         model: DualBERTModel,
@@ -58,11 +58,13 @@ class DenseRetriever(IndexerBase):
                 self.index = faiss.IndexFlatL2(self.vector_size)
 
     @torch.no_grad()
-    def build_index(self, index_path: str) -> None:
-        if os.path.exists(os.path.join(index_path, "index.dpr")) and os.path.exists(os.path.join(index_path, "meta.json")):
+    def build_index(self, index_path: str | None = None) -> None:
+        if index_path is not None and os.path.exists(os.path.join(index_path, "index.dpr")) and os.path.exists(os.path.join(index_path, "meta.json")):
             logger.info(f"Loading index from {index_path}")
             self.load(index_path)
         else:
+            if index_path is None:
+                logger.warning("Index path is not provided. The index will not be saved after building. Consider providing an index path to save the built index for future use.")
             self._initialize()
             self.meta_ids_to_keys = {k: idx for idx, k in self.dictionary.id_to_index.items()}
             self.model.eval()

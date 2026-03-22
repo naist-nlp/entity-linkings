@@ -65,10 +65,12 @@ class BM25Indexer(IndexerBase):
         self.index = BM25HF()
         self.meta_ids_to_keys: dict[int, str] = {}
 
-    def build_index(self, index_path: str) -> None:
-        if os.path.exists(os.path.join(index_path, "meta_bm25.json")):
+    def build_index(self, index_path: str | None = None) -> None:
+        if index_path is not None and os.path.exists(os.path.join(index_path, "meta_bm25.json")):
             self.load(index_path)
         else:
+            if index_path is None:
+                logger.warning("Index path is not provided. The index will not be saved after building. Consider providing an index path to save the built index for future use.")
             self._initialize()
             descriptions = []
             for i, entity in enumerate(self.dictionary):

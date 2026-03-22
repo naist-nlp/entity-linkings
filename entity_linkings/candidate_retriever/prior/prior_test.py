@@ -29,7 +29,7 @@ def prior_model() -> PRIOR:
 class TestPrior:
     def test_init(self, prior_model: PRIOR) -> None:
         assert isinstance(prior_model, PRIOR)
-        assert prior_model.retriever is not None
+        assert prior_model.indexer is not None
         assert prior_model.dictionary is not None
 
     def test_evaluate(self, prior_model: PRIOR) -> None:

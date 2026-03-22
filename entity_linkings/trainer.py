@@ -156,9 +156,9 @@ class EntityLinkingTrainer(Trainer):
         with torch.no_grad():
             if has_labels:
                 with self.compute_loss_context_manager():
-                    num_items_in_batch = self._get_num_items_in_batch([inputs], self.args.device)
+                    # num_items_in_batch = self._get_num_items_in_batch([inputs], self.args.device)
                     loss, outputs = self.compute_loss(
-                        model, inputs, return_outputs=True, num_items_in_batch=num_items_in_batch
+                        model, inputs, return_outputs=True,
                     )
                 loss = loss.detach().mean()
 

@@ -20,7 +20,7 @@ from entity_linkings.utils import BaseSystemOutput, calculate_recall_mrr
 from ..base import RetrieverBase
 from ..collator import CollatorForRetrieval
 from .encoder import DualBERTModel
-from .indexer import DenseRetriever
+from .indexer import FaissIndexer
 from .preprocessor import DualEncoderPreprocessor
 
 logger = logging.getLogger(__name__)
@@ -100,10 +100,10 @@ class DUALENCODER(RetrieverBase):
         )
         self.dictionary = self.preprocessor.dictionary_preprocess(self.dictionary)
         if index_path is not None:
-            self.retriever = self.create_retriever(index_path=index_path)
+            self.indexer = self.create_indexer(index_path=index_path)
 
-    def create_retriever(self, index_path: str) -> DenseRetriever:
-        retriever = DenseRetriever(
+    def create_indexer(self, index_path: str | None = None) -> FaissIndexer:
+        indexer = FaissIndexer(
             dictionary=self.dictionary,
             model=self.encoder,
             tokenizer=self.tokenizer,
@@ -113,8 +113,8 @@ class DUALENCODER(RetrieverBase):
             n_hubs=self.config.n_hubs,
             fp16=self.config.fp16
         )
-        retriever.build_index(index_path=index_path)
-        return retriever
+        indexer.build_index(index_path=index_path)
+        return indexer
 
     def train(
             self,
@@ -128,6 +128,8 @@ class DUALENCODER(RetrieverBase):
         set_seed(training_args.seed)
 
         if num_hard_negatives > 0:
+            if not hasattr(self, "indexer"):
+                self.indexer = self.create_indexer(index_path=None)
             train_candidates = self.retrieve_candidates(
                 train_dataset,
                 only_negative=True,
@@ -171,13 +173,20 @@ class DUALENCODER(RetrieverBase):
             trainer.save_metrics("train", results.metrics)
         return results
 
+    def convert_to_query(self, text: str, start: int, end: int) -> str:
+        marked_text = self.preprocessor._process_context(text, start, end)
+        return marked_text
+
     @torch.no_grad()
     def evaluate(self, dataset: Dataset, batch_size: int = 32, **args: int) -> dict[str, float]:
+        if not hasattr(self, "indexer"):
+            self.indexer = self.create_indexer(index_path=None)
+
         self.encoder.eval()
         queries, labels = [], []
         for text, entities in zip(dataset["text"], dataset["entities"]):
             for ent in entities:
-                marked_text = self.preprocessor._process_context(text, ent["start"], ent["end"])
+                marked_text = self.convert_to_query(text, ent["start"], ent["end"])
                 queries.append(marked_text)
                 labels.append(ent["label"])
 
@@ -185,7 +194,7 @@ class DUALENCODER(RetrieverBase):
         predictions = []
         for i in range(0, len(queries), batch_size):
             pbar.update()
-            _, batch_indices = self.retriever.search_knn(queries[i: i + batch_size], top_k=100)
+            _, batch_indices = self.indexer.search_knn(queries[i: i + batch_size], top_k=100)
             batch_labels = labels[i: i + batch_size]
             for j, indices in enumerate(batch_indices):
                 preds = [{"id": self.dictionary(inds)["id"]} for inds in indices]
@@ -196,12 +205,15 @@ class DUALENCODER(RetrieverBase):
 
     @torch.no_grad()
     def predict(self, sentence: str, spans: Optional[list[tuple[int, int]]] = None, top_k: int = 5) -> list[list[BaseSystemOutput]]:
+        if not hasattr(self, "indexer"):
+            self.indexer = self.create_indexer(index_path=None)
+
         if not spans:
             raise ValueError("Spans must be provided for SpanEntityRetrieval prediction.")
 
         self.encoder.eval()
-        inputs = [self.preprocessor._process_context(sentence, b, e) for b, e in spans]
-        similarities, indices = self.retriever.search_knn(inputs, top_k=top_k)
+        inputs = [self.convert_to_query(sentence, b, e) for b, e in spans]
+        similarities, indices = self.indexer.search_knn(inputs, top_k=top_k)
 
         all_result = []
         for i, (b, e) in enumerate(spans):
@@ -214,11 +226,14 @@ class DUALENCODER(RetrieverBase):
 
     @torch.no_grad()
     def retrieve_candidates(self, dataset: Dataset, top_k: int = 5, only_negative: bool = False, batch_size: int = 32, **args: int) -> list[list[str]]:
+        if not hasattr(self, "indexer"):
+            self.indexer = self.create_indexer(index_path=None)
+
         self.encoder.eval()
         queries, labels = [], []
         for text, entities in zip(dataset["text"], dataset["entities"]):
             for ent in entities:
-                query = self.preprocessor._process_context(text, ent["start"], ent["end"])
+                query = self.convert_to_query(text, ent["start"], ent["end"])
                 queries.append(query)
                 labels.append(ent["label"])
 
@@ -226,7 +241,7 @@ class DUALENCODER(RetrieverBase):
         pbar  = tqdm(total=len(queries), desc='Retrieve candidates')
         for i in range(0, len(queries), batch_size):
             pbar.update(min(batch_size, len(queries[i])))
-            _, batch_indices = self.retriever.search_knn(
+            _, batch_indices = self.indexer.search_knn(
                 queries[i: i + batch_size],
                 top_k=top_k,
                 ignore_ids=labels[i: i + batch_size] if only_negative else None

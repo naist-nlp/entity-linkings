@@ -68,4 +68,12 @@ class TEXTEMBEDDING(DUALENCODER):
         )
         self.dictionary = self.preprocessor.dictionary_preprocess(self.dictionary)
         if index_path is not None:
-            self.retriever = self.create_retriever(index_path=index_path)
+            self.indexer = self.create_indexer(index_path=index_path)
+
+    def convert_to_query(self, text: str, start: int, end: int) -> str:
+        marked_text = self.preprocessor._process_context(text, start, end)
+        prefix = ""
+        if self.config.task_description:
+            prefix += f"Instruct: {self.config.task_description}\n"
+        prefix += self.config.prefix_context
+        return prefix + marked_text

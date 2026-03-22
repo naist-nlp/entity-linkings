@@ -36,7 +36,7 @@ class TestBM25Model:
             )
         )
         assert isinstance(bm25_model, BM25)
-        assert bm25_model.retriever is not None
+        assert bm25_model.indexer is not None
         assert bm25_model.dictionary is not None
 
     def test_evaluate(self) -> None:

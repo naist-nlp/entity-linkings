@@ -17,7 +17,7 @@ import assets as test_data
 from entity_linkings import load_dictionary
 
 from .encoder import DualBERTModel
-from .indexer import DenseRetriever
+from .indexer import FaissIndexer
 from .preprocessor import DualEncoderPreprocessor
 
 model_name = 'google-bert/bert-base-uncased'
@@ -35,72 +35,72 @@ preprocessor = DualEncoderPreprocessor(tokenizer, "[START_ENT]", "[END_ENT]", "[
 processed_dictionary = preprocessor.dictionary_preprocess(dictionary)
 
 
-class TestDenseRetriever:
+class TestFaissIndexer:
     def test___init__(self) -> None:
-        retriever = DenseRetriever(
+        indexer = FaissIndexer(
             model = model,
             tokenizer=tokenizer,
             dictionary=processed_dictionary,
         )
-        assert isinstance(retriever, DenseRetriever)
-        assert retriever.model is model
-        assert retriever.dictionary is processed_dictionary
-        assert retriever.vector_size == model.hidden_size
+        assert isinstance(indexer, FaissIndexer)
+        assert indexer.model is model
+        assert indexer.dictionary is processed_dictionary
+        assert indexer.vector_size == model.hidden_size
 
     @pytest.mark.parametrize("metric",["inner_product", "cosine", "euclidean"])
     @pytest.mark.parametrize("use_hnsw",[True, False])
     def test_initialize(self, use_hnsw: bool, metric: str) -> None:
-        retriever = DenseRetriever(
+        indexer = FaissIndexer(
             model=model,
             tokenizer=tokenizer,
             dictionary=processed_dictionary,
             use_hnsw=use_hnsw,
             metric=metric,
         )
-        retriever._initialize()
+        indexer._initialize()
         if use_hnsw:
             if metric == "euclidean":
-                assert isinstance(retriever.index, IndexHNSWFlat) and retriever.index.metric_type == METRIC_L2
+                assert isinstance(indexer.index, IndexHNSWFlat) and indexer.index.metric_type == METRIC_L2
             else:
-                assert isinstance(retriever.index, IndexHNSWFlat) and retriever.index.metric_type == METRIC_INNER_PRODUCT
+                assert isinstance(indexer.index, IndexHNSWFlat) and indexer.index.metric_type == METRIC_INNER_PRODUCT
         else:
             if metric == "euclidean":
-                assert isinstance(retriever.index, IndexFlatL2)
+                assert isinstance(indexer.index, IndexFlatL2)
             else:
-                assert isinstance(retriever.index, IndexFlatIP)
-        assert hasattr(retriever, "meta_ids_to_keys") and isinstance(retriever.meta_ids_to_keys, dict)
-        assert len(retriever.meta_ids_to_keys) == retriever.index.ntotal == 0
+                assert isinstance(indexer.index, IndexFlatIP)
+        assert hasattr(indexer, "meta_ids_to_keys") and isinstance(indexer.meta_ids_to_keys, dict)
+        assert len(indexer.meta_ids_to_keys) == indexer.index.ntotal == 0
 
     def test_build_index(self) -> None:
-        retriever = DenseRetriever(
+        indexer = FaissIndexer(
             model=model,
             tokenizer=tokenizer,
             dictionary=processed_dictionary,
         )
-        retriever.build_index()
-        assert isinstance(retriever.index, IndexFlatIP)
-        assert isinstance(retriever.meta_ids_to_keys, dict)
-        assert len(retriever.meta_ids_to_keys) == retriever.index.ntotal == len(dictionary)
+        indexer.build_index()
+        assert isinstance(indexer.index, IndexFlatIP)
+        assert isinstance(indexer.meta_ids_to_keys, dict)
+        assert len(indexer.meta_ids_to_keys) == indexer.index.ntotal == len(dictionary)
 
     @pytest.mark.parametrize("top_k", [0, 2, 5, 10])
     def test_search_knn(self, top_k: int) -> None:
-        retriever = DenseRetriever(
+        indexer = FaissIndexer(
             model=model,
             tokenizer=tokenizer,
             dictionary=processed_dictionary,
             batch_size=2,
         )
-        retriever.build_index()
+        indexer.build_index()
         for data in dataset:
             query = data['text']
             if top_k <= 0:
                 with pytest.raises(RuntimeError) as re:
-                    retriever.search_knn(query, top_k)
+                    indexer.search_knn(query, top_k)
                 assert isinstance(re.value, RuntimeError)
                 assert str(re.value) == "K is zero or under zero."
                 break
             else:
-                distances, indices = retriever.search_knn(query, top_k=top_k)
+                distances, indices = indexer.search_knn(query, top_k=top_k)
                 assert isinstance(distances, np.ndarray) and isinstance(indices, list)
                 if top_k > len(dictionary):
                     assert distances.shape[0] == len(indices) == 1
@@ -111,47 +111,47 @@ class TestDenseRetriever:
 
     @pytest.mark.parametrize("top_k", [2, 4])
     def test_search_knn_negatives(self, top_k: int) -> None:
-        retriever = DenseRetriever(
+        indexer = FaissIndexer(
             model=model,
             tokenizer=tokenizer,
             dictionary=processed_dictionary,
         )
-        retriever.build_index()
+        indexer.build_index()
         for text, entities in zip(dataset['text'], dataset['entities']):
             for ent in entities:
                 if 'label' not in ent:
                     continue
                 query = text
                 labels = ent["label"]
-                _, indices = retriever.search_knn(query, top_k, ignore_ids=labels)
+                _, indices = indexer.search_knn(query, top_k, ignore_ids=labels)
                 for i, inds in enumerate(indices):
                     assert len(inds) == top_k
                     for ind in inds:
                         assert ind not in labels[i]
 
     def test_save_and_load(self) -> None:
-        retriever = DenseRetriever(
+        indexer = FaissIndexer(
             model=model,
             tokenizer=tokenizer,
             dictionary=processed_dictionary,
         )
         with tempfile.TemporaryDirectory() as tmpdir:
-            retriever.build_index(tmpdir)
-            loaded_retriever = DenseRetriever(
+            indexer.build_index(tmpdir)
+            loaded_indexer = FaissIndexer(
                 model=model,
                 tokenizer=tokenizer,
                 dictionary=processed_dictionary,
             )
-            loaded_retriever.build_index(tmpdir)
-            assert retriever.dictionary and loaded_retriever.dictionary
-            assert retriever.meta_ids_to_keys == loaded_retriever.meta_ids_to_keys
-            assert retriever.dictionary.id_to_index == loaded_retriever.dictionary.id_to_index
+            loaded_indexer.build_index(tmpdir)
+            assert indexer.dictionary and loaded_indexer.dictionary
+            assert indexer.meta_ids_to_keys == loaded_indexer.meta_ids_to_keys
+            assert indexer.dictionary.id_to_index == loaded_indexer.dictionary.id_to_index
 
     def test_len(self) -> None:
-        retriever = DenseRetriever(
+        indexer = FaissIndexer(
             model=model,
             tokenizer=tokenizer,
             dictionary=processed_dictionary,
         )
-        retriever.build_index()
-        assert len(retriever) == len(dictionary)
+        indexer.build_index()
+        assert len(indexer) == len(dictionary)

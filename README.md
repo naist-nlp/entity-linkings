@@ -145,9 +145,9 @@ retriever = retriever_cls(
 
 # Load Candidate Reranker (Optional)
 reranker_cls = get_rerankers('chatel')
-reranker = model_cls(
+reranker = reranker_cls(
     dictionary,
-    config=model_cls.Config(
+    config=reranker_cls.Config(
         model_name_or_path = "gpt-4o"
     )
 )

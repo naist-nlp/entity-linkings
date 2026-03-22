@@ -29,19 +29,18 @@ class BM25(RetrieverBase):
 
     def __init__(self, dictionary: EntityDictionary, config: Optional[Config] = None, index_path: Optional[str] = None) -> None:
         super().__init__(dictionary, config)
-        if index_path is not None:
-            self.retriever = self.create_retriever(index_path=index_path)
+        self.indexer = self.create_indexer(index_path=index_path)
 
-    def create_retriever(self, index_path: str) -> BM25Indexer:
-        retriever =  BM25Indexer(
+    def create_indexer(self, index_path: str | None = None) -> BM25Indexer:
+        indexer =  BM25Indexer(
             dictionary=self.dictionary,
             language=self.config.language,
             n_threads=self.config.n_threads,
             subword_tokenizer=self.config.subword_tokenizer,
             query_type_for_candidate=self.config.query_type_for_candidate
         )
-        retriever.build_index(index_path=index_path)
-        return retriever
+        indexer.build_index(index_path=index_path)
+        return indexer
 
     def evaluate(self, dataset: Dataset, batch_size: int = 32, **args: int) -> dict[str, float]:
         queries, labels = [], []
@@ -61,7 +60,7 @@ class BM25(RetrieverBase):
         pbar = tqdm(total=(math.ceil(len(queries)/batch_size)), desc='Evaluate')
         for i in range(0, len(queries), batch_size):
             pbar.update()
-            _, batch_indices = self.retriever.search_knn(queries[i:i + batch_size], top_k=100)
+            _, batch_indices = self.indexer.search_knn(queries[i:i + batch_size], top_k=100)
             batch_labels = labels[i:i + batch_size]
             for j, indices in enumerate(batch_indices):
                 preds = [{"id": self.dictionary(inds)["id"]} for inds in indices]
@@ -77,7 +76,7 @@ class BM25(RetrieverBase):
         queries = []
         for b, e in spans:
             queries.append(sentence[b:e])
-        similarities, indices = self.retriever.search_knn(queries, top_k=top_k)
+        similarities, indices = self.indexer.search_knn(queries, top_k=top_k)
         all_result = []
         for i, (b, e) in enumerate(spans):
             result = []
@@ -109,7 +108,7 @@ class BM25(RetrieverBase):
             pbar.update()
             batch_queries = queries[i:i + batch_size]
             batch_labels = labels[i:i + batch_size]
-            _, batch_indices = self.retriever.search_knn(batch_queries, top_k=top_k, ignore_ids=batch_labels if only_negative else None)
+            _, batch_indices = self.indexer.search_knn(batch_queries, top_k=top_k, ignore_ids=batch_labels if only_negative else None)
             all_candidates.extend(batch_indices)
         pbar.close()
 

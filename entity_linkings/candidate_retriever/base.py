@@ -19,7 +19,7 @@ class IndexerBase(abc.ABC):
     def _initialize(self) -> None:
         raise NotImplementedError
 
-    def build_index(self, index_path: str) -> None:
+    def build_index(self, index_path: str | None = None) -> None:
         raise NotImplementedError
 
     def save_index(self, index_path: str, ensure_ascii: bool = False) -> None:
@@ -49,7 +49,7 @@ class RetrieverBase(abc.ABC):
         self.dictionary = dictionary
         self.config = config if config is not None else self.Config()
 
-    def create_retriever(self, index_path: str) -> IndexerBase:
+    def create_indexer(self, index_path: str | None = None) -> IndexerBase:
         raise NotImplementedError
 
     def train(self, train_dataset: Dataset, eval_dataset: Optional[Dataset] = None, num_hard_negatives: int = 0, training_args: Optional[TrainingArguments] = None) -> dict[str, float]:
