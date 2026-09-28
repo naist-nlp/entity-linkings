@@ -1,4 +1,5 @@
 import logging
+import os
 from argparse import ArgumentParser, Namespace
 
 from entity_linkings import get_retrievers, load_dictionary
@@ -9,6 +10,11 @@ logger.setLevel("INFO")
 
 
 def build_index(args: Namespace) -> None:
+    # Indexes grow with the size of the dictionary and can take hours to build, so never
+    # replace one that is already there without being told to.
+    if os.path.isdir(args.output_dir) and os.listdir(args.output_dir) and not args.overwrite:
+        raise FileExistsError(f"{args.output_dir} is not empty. Pass --overwrite to rebuild the index in it.")
+
     dictionary = load_dictionary(args.dictionary_id_or_path, cache_dir=args.cache_dir)
     if args.retriever_config is not None:
         retriever_config = read_yaml(args.retriever_config).get(args.retriever_id, {})
@@ -29,8 +35,9 @@ def cli_main() -> None:
     parser.add_argument('--retriever_model_name_or_path', type=str, default=None, help='Name of the model to use.')
     parser.add_argument('--retriever_config', type=str, default=None, help='YAML-based config file.')
     parser.add_argument('--dictionary_id_or_path', type=str, default=None, help='Path to the entity dictionary file.')
-    parser.add_argument('--output_dir', type=str, default=None, help='Path to the output directory.')
+    parser.add_argument('--output_dir', type=str, required=True, help='Path to the output directory.')
     parser.add_argument("--cache_dir", type=str, default=None, help='Path to the cache directory.')
+    parser.add_argument('--overwrite', action='store_true', default=False, help='Whether to rebuild the index even if the output directory is not empty.')
     args = parser.parse_args()
     build_index(args)
 

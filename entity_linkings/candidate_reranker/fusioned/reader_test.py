@@ -5,7 +5,7 @@ from transformers import AutoModelForSeq2SeqLM
 
 from .reader import CheckpointWrapper, EncoderWrapper, FusionDecoder
 
-MODELS = ["google/flan-t5-small"]
+MODELS = ["hf-internal-testing/tiny-random-T5ForConditionalGeneration"]
 
 
 def mock_input(

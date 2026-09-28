@@ -10,6 +10,26 @@ ENCODER_DECODER_MODELS = {
 }
 
 
+class ModelConfig(dict):
+    """A config mapping that also answers to attribute access.
+
+    transformers 5's Trainer sets ``model.config.use_cache`` as it starts up, which a
+    plain dict cannot take. Reads fall through to the mapping, so the subscripts the
+    models already use keep working.
+    """
+
+    def __getattr__(self, name: str) -> Any:
+        try:
+            return self[name]
+        except KeyError:
+            raise AttributeError(name) from None
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        # Held as an instance attribute rather than an entry, so that what the Trainer
+        # writes here stays out of the mapping that save_pretrained dumps.
+        object.__setattr__(self, name, value)
+
+
 @dataclass
 class BaseSystemOutput:
     query: str
@@ -73,8 +93,10 @@ def first_token_pooler(last_hidden_states: torch.Tensor, attention_mask: torch.T
     """
     if attention_mask[:, 0].sum() == 0 and attention_mask[:, -1].sum() > 0:
         # left padding is used, use the first non-padding token as the last token.
+        # The row index has to be given alongside the position, as last_token_pooler
+        # does: indexing with the lengths alone spreads the batch over two dimensions.
         seq_lens = attention_mask.sum(dim=1)
-        return last_hidden_states[:, -seq_lens, :]
+        return last_hidden_states[torch.arange(last_hidden_states.size(0)), -seq_lens, :]
     else:
         # right padding is used. use the first token as the start token.
         return last_hidden_states[:, 0, :]

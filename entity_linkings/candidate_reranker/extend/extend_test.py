@@ -12,7 +12,7 @@ from entity_linkings.utils import BaseSystemOutput
 
 from .extend import EXTEND
 
-MODELS = ["allenai/longformer-base-4096"]
+MODELS = ["hf-internal-testing/tiny-random-LongformerModel"]
 dictionary_path = str(files(test_data).joinpath("dictionary_toy.jsonl"))
 dictionary = load_dictionary(dictionary_path)
 dataset_path = str(files(test_data).joinpath("dataset_toy.jsonl"))

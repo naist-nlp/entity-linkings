@@ -3,6 +3,7 @@ from typing import Optional
 
 from datasets import Dataset
 from transformers import set_seed
+from transformers.trainer_utils import TrainOutput
 
 from entity_linkings.data_utils import EntityDictionary
 from entity_linkings.trainer import EntityLinkingTrainer, TrainingArguments
@@ -19,12 +20,14 @@ class E5BM25(TEXTEMBEDDING):
 
     @dataclass
     class Config(TEXTEMBEDDING.Config):
-        model_name_or_path: Optional[str] = "intfloat/e5-base"
+        model_name_or_path: str = "intfloat/e5-base"
         candidate_pool_size: int = 40
         random_negative_sampling: bool = True
         query_type_for_candidate: str = "mention"
         language: str = "en"
         subword_tokenizer: bool = False
+
+    config: Config
 
     def __init__(self, dictionary: EntityDictionary, config: Optional[Config] = None, index_path: Optional[str] = None) -> None:
         super().__init__(dictionary, config, index_path)
@@ -35,7 +38,7 @@ class E5BM25(TEXTEMBEDDING):
             eval_dataset: Optional[Dataset] = None,
             num_hard_negatives: int = 0,
             training_args: Optional[TrainingArguments] = None
-        ) -> dict[str, float]:
+        ) -> TrainOutput:
         if num_hard_negatives > self.config.candidate_pool_size:
             raise ValueError(
                 f"The number of hard negatives ({num_hard_negatives}) "

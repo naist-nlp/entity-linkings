@@ -1,11 +1,9 @@
 import logging
-import math
 import random
 from dataclasses import dataclass
 from typing import Literal, Optional
 
 from datasets import Dataset
-from tqdm.auto import tqdm
 
 from entity_linkings.data_utils import EntityDictionary
 from entity_linkings.utils import BaseSystemOutput, calculate_recall_mrr
@@ -26,10 +24,13 @@ class BM25(RetrieverBase):
         n_threads: int = -1
         subword_tokenizer: Optional[str] = None
         query_type_for_candidate: Literal['mention', 'description'] = 'mention'
+        search_batch_size: int = 1024
+
+    config: Config
 
     def __init__(self, dictionary: EntityDictionary, config: Optional[Config] = None, index_path: Optional[str] = None) -> None:
         super().__init__(dictionary, config)
-        self.indexer = self.create_indexer(index_path=index_path)
+        self.indexer = self.create_indexer(index_path=index_path) if index_path is not None else None
 
     def create_indexer(self, index_path: str | None = None) -> BM25Indexer:
         indexer =  BM25Indexer(
@@ -37,12 +38,17 @@ class BM25(RetrieverBase):
             language=self.config.language,
             n_threads=self.config.n_threads,
             subword_tokenizer=self.config.subword_tokenizer,
-            query_type_for_candidate=self.config.query_type_for_candidate
+            query_type_for_candidate=self.config.query_type_for_candidate,
+            batch_size=self.config.search_batch_size
         )
         indexer.build_index(index_path=index_path)
         return indexer
 
     def evaluate(self, dataset: Dataset, batch_size: int = 32, **args: int) -> dict[str, float]:
+        if self.indexer is None:
+            logger.warning("Indexer not found. Creating indexer with default settings. This may take some time if the index is large.")
+            self.indexer = self.create_indexer(index_path=None)
+
         queries, labels = [], []
         for text, entities in zip(dataset["text"], dataset["entities"]):
             for ent in entities:
@@ -56,27 +62,26 @@ class BM25(RetrieverBase):
                     queries.append(self.dictionary(ent_label)["description"])
                 labels.append(ent_labels)
 
+        _, all_indices = self.indexer.search_knn(queries, top_k=100, batch_size=batch_size)
+
         predictions = []
-        pbar = tqdm(total=(math.ceil(len(queries)/batch_size)), desc='Evaluate')
-        for i in range(0, len(queries), batch_size):
-            pbar.update()
-            _, batch_indices = self.indexer.search_knn(queries[i:i + batch_size], top_k=100)
-            batch_labels = labels[i:i + batch_size]
-            for j, indices in enumerate(batch_indices):
-                preds = [{"id": self.dictionary(inds)["id"]} for inds in indices]
-                predictions.append({"gold": batch_labels[j], "predict": preds})
-        pbar.close()
+        for i, indices in enumerate(all_indices):
+            preds = [{"id": self.dictionary(inds)["id"]} for inds in indices]
+            predictions.append({"gold": labels[i], "predict": preds})
         metric = calculate_recall_mrr(predictions)
         return metric
 
     def predict(self, sentence: str, spans: Optional[list[tuple[int, int]]] = None, top_k: int = 5) -> list[list[BaseSystemOutput]]:
+        if self.indexer is None:
+            logger.warning("Indexer not found. Creating indexer with default settings. This may take some time if the index is large.")
+            self.indexer = self.create_indexer(index_path=None)
         if not spans:
             raise ValueError("Spans must be provided for BM25 prediction.")
 
         queries = []
         for b, e in spans:
             queries.append(sentence[b:e])
-        similarities, indices = self.indexer.search_knn(queries, top_k=top_k)
+        _, indices = self.indexer.search_knn(queries, top_k=top_k)
         all_result = []
         for i, (b, e) in enumerate(spans):
             result = []
@@ -88,6 +93,10 @@ class BM25(RetrieverBase):
         return all_result
 
     def retrieve_candidates(self, dataset: Dataset, top_k: int = 5, only_negative: bool = False, batch_size: int = 32, **args: int) -> list[list[str]]:
+        if self.indexer is None:
+            logger.warning("Indexer not found. Creating indexer with default settings. This may take some time if the index is large.")
+            self.indexer = self.create_indexer(index_path=None)
+
         queries, labels = [], []
         for example in dataset:
             text = example['text']
@@ -102,14 +111,10 @@ class BM25(RetrieverBase):
                     queries.append(self.dictionary(ent_label)["description"])
                 labels.append(ent_labels)
 
-        all_candidates = []
-        pbar = tqdm(total=(math.ceil(len(queries)/batch_size)), desc='Retrieve candidates')
-        for i in range(0, len(queries), batch_size):
-            pbar.update()
-            batch_queries = queries[i:i + batch_size]
-            batch_labels = labels[i:i + batch_size]
-            _, batch_indices = self.indexer.search_knn(batch_queries, top_k=top_k, ignore_ids=batch_labels if only_negative else None)
-            all_candidates.extend(batch_indices)
-        pbar.close()
-
+        _, all_candidates = self.indexer.search_knn(
+            queries,
+            top_k=top_k,
+            ignore_ids=labels if only_negative else None,
+            batch_size=batch_size
+        )
         return all_candidates

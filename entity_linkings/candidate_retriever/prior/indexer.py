@@ -3,6 +3,7 @@ import os
 import pickle
 import random
 import re
+from collections.abc import Callable
 from logging import getLogger
 from typing import Optional
 
@@ -19,40 +20,31 @@ logger.setLevel("INFO")
 punc_remover = re.compile(r"[\W]+")
 
 
+def _merge_by_simplified(
+        mention_entities_counter: dict[str, dict[str, int]],
+        simplify: Callable[[str], str],
+    ) -> dict[str, dict[str, int]]:
+    '''Group mentions whose simplified form collides, summing their entity counts.
+
+    Each bucket starts as a fresh dict. Storing the caller's dict here instead would
+    alias it, and the next mention that simplifies to the same key would add its counts
+    straight into mention_id_counter, which is the exact-match table.
+    '''
+    merged: dict[str, dict[str, int]] = {}
+    for mention, entity_counts in mention_entities_counter.items():
+        bucket = merged.setdefault(simplify(mention), {})
+        for entity, count in entity_counts.items():
+            bucket[entity] = bucket.get(entity, 0) + count
+    return merged
+
+
 def build_simpler_mentions_dict(mention_entities_counter: dict[str, dict[str, int]]) -> dict[str, dict[str, int]]:
-    simpler_mentions_candidate_dict: dict[str, dict[str, int]] = {}
-    for mention in mention_entities_counter:
-        # create mention without blanks and lower cased
-        simplified_mention = mention.replace(' ', '').lower()
-        # the simplified mention already occurred from another mention
-        if simplified_mention in simpler_mentions_candidate_dict:
-            for entity in mention_entities_counter[mention]:
-                if entity in simpler_mentions_candidate_dict[simplified_mention]:
-                    simpler_mentions_candidate_dict[simplified_mention][entity] += mention_entities_counter[mention][entity]
-                else:
-                    simpler_mentions_candidate_dict[simplified_mention][entity] = mention_entities_counter[mention][entity]
-        # its the first occurrence of the simplified mention
-        else:
-            simpler_mentions_candidate_dict[simplified_mention] = mention_entities_counter[mention]
-    return simpler_mentions_candidate_dict
+    # mention without blanks and lower cased
+    return _merge_by_simplified(mention_entities_counter, lambda mention: mention.replace(' ', '').lower())
 
 
 def build_most_simpler_mentions_dict(mention_entities_counter: dict[str, dict[str, int]]) -> dict[str, dict[str, int]]:
-    even_more_simpler_mentions_candidate_dict: dict[str, dict[str, int]] = {}
-    for mention in mention_entities_counter:
-        # create simplified mention
-        simplified_mention=punc_remover.sub("", mention.lower())
-        # the simplified mention already occurred from another mention
-        if simplified_mention in even_more_simpler_mentions_candidate_dict:
-            for entity in mention_entities_counter[mention]:
-                if entity in even_more_simpler_mentions_candidate_dict[simplified_mention]:
-                    even_more_simpler_mentions_candidate_dict[simplified_mention][entity] += mention_entities_counter[mention][entity]
-                else:
-                    even_more_simpler_mentions_candidate_dict[simplified_mention][entity] = mention_entities_counter[mention][entity]
-        # its the first occurrence of the simplified mention
-        else:
-            even_more_simpler_mentions_candidate_dict[simplified_mention] = mention_entities_counter[mention]
-    return even_more_simpler_mentions_candidate_dict
+    return _merge_by_simplified(mention_entities_counter, lambda mention: punc_remover.sub("", mention.lower()))
 
 
 class MentionPriorIndexer(IndexerBase):
@@ -87,28 +79,24 @@ class MentionPriorIndexer(IndexerBase):
     def search_knn(self, query: str|list[str], top_k: int, ignore_ids: Optional[list[str]|list[list[str]]] = None) -> tuple[np.ndarray, list[list[str]]]:
         if top_k <= 0:
             raise RuntimeError("K is zero or under zero.")
-        if top_k > self.num_entities:
-            top_k = self.num_entities
-            logger.warning(f"K is over size of dictionary. K is modified to size of dictionary to {self.num_entities}")
 
         queries = [query] if type(query) is str else query
         scores, indices_keys = [], []
 
-        is_per_query_ignore = False
-        global_ignore_set = set()
-        if ignore_ids is not None:
-            if isinstance(ignore_ids[0], list):
-                is_per_query_ignore = True
-            else:
-                global_ignore_set = set(ignore_ids)
+        unwanted = self.normalize_ignore_ids(ignore_ids, len(queries))
+        max_ignored = max((len(ids) for ids in unwanted), default=0)
+
+        # Short rows cannot be returned, because every row of the score array has to be
+        # the same length, so cap K by what the dictionary can still supply for the most
+        # heavily filtered query. Without this the padding loop below would be asked for
+        # more entities than are left and would never finish.
+        selectable = self.num_entities - max_ignored
+        if top_k > selectable:
+            logger.warning(f"K is over the number of selectable entities. K is modified to {selectable}.")
+            top_k = selectable
 
         for i, query in enumerate(queries):
-            if ignore_ids is None:
-                current_ignore_set = set()
-            elif is_per_query_ignore:
-                current_ignore_set = set(ignore_ids[i])
-            else:
-                current_ignore_set = global_ignore_set.copy()
+            current_ignore_set = set(unwanted[i])
 
             candidates = self.mention_id_counter.get(query, None)
             if not candidates:
@@ -130,16 +118,24 @@ class MentionPriorIndexer(IndexerBase):
             if num_needed > 0:
                 if not candidates:
                     logger.info(f'No candidates found for mention "{query}".')
-                final_scores.extend([0.0] * num_needed)
+                # One sample covers the usual case, where the ignored ids are a tiny
+                # fraction of the dictionary. Walking the ids is the fallback for when
+                # too many of the sampled ones were ignored; it is bounded, whereas
+                # sampling until the quota is met is not.
                 sample_size = min(num_needed * 2 + 50, self.num_entities)
-                while len(final_ids) < top_k:
-                    random_samples = random.sample(self.entity_ids, sample_size)
-                    for r_s in random_samples:
-                        if r_s not in current_ignore_set:
-                            final_ids.append(r_s)
-                            current_ignore_set.add(r_s)
-                            if len(final_ids) == top_k:
-                                break
+                fillers: list[str] = []
+                for pool in (random.sample(self.entity_ids, sample_size), self.entity_ids):
+                    for entity_id in pool:
+                        if entity_id in current_ignore_set:
+                            continue
+                        fillers.append(entity_id)
+                        current_ignore_set.add(entity_id)
+                        if len(fillers) == num_needed:
+                            break
+                    if len(fillers) == num_needed:
+                        break
+                final_ids.extend(fillers)
+                final_scores.extend([0.0] * len(fillers))
             indices_keys.append(final_ids)
             scores.append(final_scores)
 
@@ -161,7 +157,7 @@ class MentionPriorIndexer(IndexerBase):
 
     def save_index(self, index_path: str, ensure_ascii: bool = False) -> None:
         if not os.path.isdir(index_path):
-            os.mkdir(index_path)
+            os.makedirs(index_path, exist_ok=True)
         logger.info("Serializing index to %s", index_path)
         mention_entities_counter_file = os.path.join(index_path, "mention_entities_counter.pickle")
         simpler_mentions_candidate_file = os.path.join(index_path, "simpler_mentions_candidate_dict.pickle")

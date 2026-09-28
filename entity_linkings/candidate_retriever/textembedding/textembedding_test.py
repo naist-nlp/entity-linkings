@@ -3,7 +3,7 @@ from importlib.resources import files
 
 import pytest
 from datasets import load_dataset
-from transformers import BertTokenizerFast
+from transformers import PreTrainedTokenizerBase
 from transformers.trainer_utils import TrainOutput
 
 import assets as test_data
@@ -13,37 +13,37 @@ from entity_linkings.trainer import TrainingArguments
 from .encoder import TextEmbeddingModel
 from .textembedding import TEXTEMBEDDING
 
-TEXT_EMBEDDING_MODELS = ["intfloat/e5-base"]
+TEXT_EMBEDDING_MODELS = ["hf-internal-testing/tiny-random-BertModel"]
 
 dataset_path = str(files(test_data).joinpath("dataset_toy.jsonl"))
 dictionary_path = str(files(test_data).joinpath("dictionary_toy.jsonl"))
 dictionary = load_dictionary(dictionary_path)
 dataset = load_dataset("json", data_files={"test": dataset_path})['test']
 
-@pytest.mark.span_retrieval_text_embedding
+@pytest.mark.retriever_text_embedding
 class TestSpanEntityRetrieverForTextEmbedding:
-    def test__init__(self) -> None:
+    @pytest.mark.parametrize("model_name", TEXT_EMBEDDING_MODELS)
+    def test__init__(self, model_name: str) -> None:
         model = TEXTEMBEDDING(
             dictionary=dictionary,
-            config=TEXTEMBEDDING.Config(
-                model_name_or_path=TEXT_EMBEDDING_MODELS[0]
-            )
+            config=TEXTEMBEDDING.Config(model_name_or_path=model_name)
         )
         assert isinstance(model, TEXTEMBEDDING)
-        assert isinstance(model.tokenizer, BertTokenizerFast)
+        assert isinstance(model.tokenizer, PreTrainedTokenizerBase)
         assert isinstance(model.encoder, TextEmbeddingModel)
         assert model.config.ent_start_token in model.tokenizer.all_special_tokens
         assert model.config.ent_start_token in model.tokenizer.all_special_tokens
         assert model.config.entity_token in model.tokenizer.all_special_tokens
         assert model.config.nil_token in model.tokenizer.all_special_tokens
-        assert model.config.model_name_or_path == TEXT_EMBEDDING_MODELS[0]
+        assert model.config.model_name_or_path == model_name
         for processed in model.dictionary:
             assert "encoding" in processed
             assert "input_ids" in processed["encoding"]
             assert "attention_mask" in processed["encoding"]
 
-    def test_train(self) -> None:
-        model = TEXTEMBEDDING(dictionary=dictionary)
+    @pytest.mark.parametrize("model_name", TEXT_EMBEDDING_MODELS)
+    def test_train(self, model_name: str) -> None:
+        model = TEXTEMBEDDING(dictionary=dictionary, config=TEXTEMBEDDING.Config(model_name_or_path=model_name))
         with tempfile.TemporaryDirectory() as tmpdir:
             result = model.train(
                 train_dataset=dataset,
@@ -64,8 +64,9 @@ class TestSpanEntityRetrieverForTextEmbedding:
             assert isinstance(result, TrainOutput)
             assert hasattr(result, 'metrics')
 
-    def test_evaluate(self) -> None:
-        model = TEXTEMBEDDING(dictionary=dictionary)
+    @pytest.mark.parametrize("model_name", TEXT_EMBEDDING_MODELS)
+    def test_evaluate(self, model_name: str) -> None:
+        model = TEXTEMBEDDING(dictionary=dictionary, config=TEXTEMBEDDING.Config(model_name_or_path=model_name))
         metrics = model.evaluate(dataset)
         assert 'recall@1' in metrics
         assert 'recall@10' in metrics
@@ -73,8 +74,9 @@ class TestSpanEntityRetrieverForTextEmbedding:
         assert 'recall@100' in metrics
         assert 'mrr@100' in metrics
 
-    def test_predict(self) -> None:
-        model = TEXTEMBEDDING(dictionary=dictionary)
+    @pytest.mark.parametrize("model_name", TEXT_EMBEDDING_MODELS)
+    def test_predict(self, model_name: str) -> None:
+        model = TEXTEMBEDDING(dictionary=dictionary, config=TEXTEMBEDDING.Config(model_name_or_path=model_name))
         sentence = "Steve Jobs was found Apple."
         spans = [(21, 26)]
         top_k = 3
@@ -85,8 +87,9 @@ class TestSpanEntityRetrieverForTextEmbedding:
             assert isinstance(preds, list)
             assert len(preds) == min(top_k, len(dictionary))
 
-    def test_retrieve_candidates(self) -> None:
-        model = TEXTEMBEDDING(dictionary=dictionary)
+    @pytest.mark.parametrize("model_name", TEXT_EMBEDDING_MODELS)
+    def test_retrieve_candidates(self, model_name: str) -> None:
+        model = TEXTEMBEDDING(dictionary=dictionary, config=TEXTEMBEDDING.Config(model_name_or_path=model_name))
         top_k = 3
         candidate_lists = model.retrieve_candidates(dataset, top_k=top_k, batch_size=1, negative=True)
         assert isinstance(candidate_lists, list)

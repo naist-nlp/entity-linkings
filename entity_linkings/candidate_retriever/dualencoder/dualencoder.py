@@ -9,9 +9,11 @@ from datasets import Dataset
 from tqdm.auto import tqdm
 from transformers import (
     AutoTokenizer,
+    BatchEncoding,
     EvalPrediction,
     set_seed,
 )
+from transformers.trainer_utils import TrainOutput
 
 from entity_linkings.data_utils import EntityDictionary
 from entity_linkings.trainer import EntityLinkingTrainer, TrainingArguments
@@ -61,7 +63,7 @@ class DUALENCODER(RetrieverBase):
             - num_hard_negatives (int): Number of hard negatives to sample during training
             - temperature (float): Temperature for scaling similarity scores
         '''
-        model_name_or_path: Optional[str] = "google-bert/bert-base-uncased"
+        model_name_or_path: str = "google-bert/bert-base-uncased"
         ent_start_token: str = "[START_ENT]"
         ent_end_token: str = "[END_ENT]"
         entity_token: str = "[ENT]"
@@ -76,6 +78,8 @@ class DUALENCODER(RetrieverBase):
         n_hubs: int = 10
         use_hnsw: bool = False
         fp16: bool = False
+
+    config: Config
 
     def __init__(self, dictionary: EntityDictionary, config: Optional[Config] = None, index_path: Optional[str] = None) -> None:
         super().__init__(dictionary, config)
@@ -99,8 +103,7 @@ class DUALENCODER(RetrieverBase):
             self.config.max_candidate_length, self.config.context_window_chars
         )
         self.dictionary = self.preprocessor.dictionary_preprocess(self.dictionary)
-        if index_path is not None:
-            self.indexer = self.create_indexer(index_path=index_path)
+        self.indexer = self.create_indexer(index_path=index_path) if index_path is not None else None
 
     def create_indexer(self, index_path: str | None = None) -> FaissIndexer:
         indexer = FaissIndexer(
@@ -122,13 +125,13 @@ class DUALENCODER(RetrieverBase):
             eval_dataset: Optional[Dataset] = None,
             num_hard_negatives: int = 0,
             training_args: Optional[TrainingArguments] = None
-        ) -> dict[str, float]:
+        ) -> TrainOutput:
         if training_args is None:
             training_args = TrainingArguments()
         set_seed(training_args.seed)
 
         if num_hard_negatives > 0:
-            if not hasattr(self, "indexer"):
+            if self.indexer is None:
                 self.indexer = self.create_indexer(index_path=None)
             train_candidates = self.retrieve_candidates(
                 train_dataset,
@@ -173,24 +176,26 @@ class DUALENCODER(RetrieverBase):
             trainer.save_metrics("train", results.metrics)
         return results
 
-    def convert_to_query(self, text: str, start: int, end: int) -> str:
-        marked_text = self.preprocessor._process_context(text, start, end)
-        return marked_text
+    def convert_to_query(self, text: str, start: int, end: int) -> BatchEncoding:
+        return self.preprocessor.process_context(text, start, end)
 
     @torch.no_grad()
     def evaluate(self, dataset: Dataset, batch_size: int = 32, **args: int) -> dict[str, float]:
-        if not hasattr(self, "indexer"):
+        if self.indexer is None:
             self.indexer = self.create_indexer(index_path=None)
 
         self.encoder.eval()
         queries, labels = [], []
         for text, entities in zip(dataset["text"], dataset["entities"]):
             for ent in entities:
-                marked_text = self.convert_to_query(text, ent["start"], ent["end"])
-                queries.append(marked_text)
+                # A mention with no gold entity cannot be retrieved, so counting it would
+                # put a ceiling under 1.0 on every recall. BM25 and PRIOR leave these out.
+                if not ent["label"]:
+                    continue
+                queries.append(self.convert_to_query(text, ent["start"], ent["end"]))
                 labels.append(ent["label"])
 
-        pbar = tqdm(total=(math.ceil(len(queries)//batch_size)), desc='Evaluate')
+        pbar = tqdm(total=(math.ceil(len(queries) / batch_size)), desc='Evaluate')
         predictions = []
         for i in range(0, len(queries), batch_size):
             pbar.update()
@@ -205,7 +210,7 @@ class DUALENCODER(RetrieverBase):
 
     @torch.no_grad()
     def predict(self, sentence: str, spans: Optional[list[tuple[int, int]]] = None, top_k: int = 5) -> list[list[BaseSystemOutput]]:
-        if not hasattr(self, "indexer"):
+        if self.indexer is None:
             self.indexer = self.create_indexer(index_path=None)
 
         if not spans:
@@ -226,13 +231,17 @@ class DUALENCODER(RetrieverBase):
 
     @torch.no_grad()
     def retrieve_candidates(self, dataset: Dataset, top_k: int = 5, only_negative: bool = False, batch_size: int = 32, **args: int) -> list[list[str]]:
-        if not hasattr(self, "indexer"):
+        if self.indexer is None:
             self.indexer = self.create_indexer(index_path=None)
 
         self.encoder.eval()
         queries, labels = [], []
         for text, entities in zip(dataset["text"], dataset["entities"]):
             for ent in entities:
+                # data_flatten drops mentions with no gold entity, and
+                # dataset_preprocess checks that the candidates line up with it.
+                if not ent["label"]:
+                    continue
                 query = self.convert_to_query(text, ent["start"], ent["end"])
                 queries.append(query)
                 labels.append(ent["label"])
@@ -240,9 +249,9 @@ class DUALENCODER(RetrieverBase):
         candidates = []
         pbar  = tqdm(total=len(queries), desc='Retrieve candidates')
         for i in range(0, len(queries), batch_size):
-            pbar.update(min(batch_size, len(queries[i])))
+            pbar.update(min(batch_size, len(queries) - i))
             _, batch_indices = self.indexer.search_knn(
-                queries[i: i + batch_size],
+                query=queries[i: i + batch_size],
                 top_k=top_k,
                 ignore_ids=labels[i: i + batch_size] if only_negative else None
             )

@@ -34,6 +34,23 @@ def preprocess(
     return splits
 
 
+def special_token_affixes(tokenizer: PreTrainedTokenizer) -> tuple[list[int], list[int]]:
+    '''Work out what the tokenizer puts before and after a sequence.
+
+    transformers 5 dropped build_inputs_with_special_tokens, which used to be asked
+    this directly. A probe token is encoded with and without the special tokens
+    instead, and the bare ids are located inside the decorated ones.
+    '''
+    bare = tokenizer.encode("x", add_special_tokens=False)
+    decorated = tokenizer.encode("x", add_special_tokens=True)
+    for i in range(len(decorated) - len(bare) + 1):
+        if decorated[i : i + len(bare)] == bare:
+            return decorated[:i], decorated[i + len(bare) :]
+    # A tokenizer that rewrites the probe rather than wrapping it tells us nothing
+    # about the affixes, so claim none rather than guess at a split.
+    return [], []
+
+
 class Preprocessor:
     def __init__(
             self,
@@ -57,21 +74,16 @@ class Preprocessor:
         self.end_marker_id = self.tokenizer.convert_tokens_to_ids(self.ent_end_token)
 
         # Prepare prefix and suffix ids for special tokens
+        head_ids, tail_ids = special_token_affixes(self.tokenizer)
         if self.tokenizer.cls_token:
             self.prefix_ids = [self.tokenizer.cls_token_id]
         else:
-            dummy_id = -1
-            with_special_tokens = self.tokenizer.build_inputs_with_special_tokens([dummy_id])
-            dummy_idx = with_special_tokens.index(dummy_id)
-            self.prefix_ids = with_special_tokens[:dummy_idx]
+            self.prefix_ids = head_ids
 
         if self.tokenizer.sep_token:
             self.suffix_ids = [self.tokenizer.sep_token_id]
         else:
-            dummy_id = -1
-            with_special_tokens = self.tokenizer.build_inputs_with_special_tokens([dummy_id])
-            dummy_idx = with_special_tokens.index(dummy_id)
-            self.suffix_ids = with_special_tokens[dummy_idx + 1 :]
+            self.suffix_ids = tail_ids
 
         self.offset_correction = len(self.prefix_ids)
         self.max_context_length = self.max_context_length - len(self.prefix_ids) - len(self.suffix_ids)
@@ -136,5 +148,4 @@ class Preprocessor:
         def preprocess_example(name: str, description: str) -> BatchEncoding:
             encodings  = self.process_candidate(name, description)
             return encodings
-        dictionary.add_encoding(preprocess_example)
-        return dictionary
+        return dictionary.with_encoding(preprocess_example)

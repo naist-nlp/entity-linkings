@@ -37,18 +37,19 @@ def compute_char_to_tokens(context: str, context_mask: list[bool], offsets_map: 
     first = True
     for _t_idx, (m, cp) in enumerate(zip(context_mask, offsets_map)):
         if m:
-            while (
-                offsets_map[_t_idx][0] < offsets_map[_t_idx][1]
-                and context[offsets_map[_t_idx][0]] == " "
-            ):
-                offsets_map[_t_idx][0] += 1
+            # A fast tokenizer hands back tuples, so the span is rebuilt rather than
+            # written through: assigning into it raised TypeError as soon as a context
+            # began with a tab or a full-width space.
+            start, stop = cp
+            while start < stop and context[start] == " ":
+                start += 1
 
             # add prefix space seems to be bugged on some tokenizers
             if first:
                 first = False
-                if cp[0] != 0 and context[cp[0] - 1] != " ":
-                    offsets_map[_t_idx][0] -= 1
-                    cp = (cp[0] - 1, cp[1])
+                if start != 0 and context[start - 1] != " ":
+                    start -= 1
+            cp = (start, stop)
             if cp[0] == cp[1]:
                 assert context[cp[0] - 1] == " ", f"Token {_t_idx} found to occur at char span ({cp[0]}, {cp[1]}), which is impossible"
             for c in range(*cp):

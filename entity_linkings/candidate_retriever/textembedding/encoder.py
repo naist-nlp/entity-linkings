@@ -4,7 +4,7 @@ from typing import Optional
 import torch
 import torch.nn as nn
 
-from entity_linkings.utils import get_pooler, load_model
+from entity_linkings.utils import ModelConfig, get_pooler, load_model
 
 
 class TextEmbeddingModel(nn.Module):
@@ -27,12 +27,12 @@ class TextEmbeddingModel(nn.Module):
             raise ValueError("Distance must be 'inner_product', 'cosine', or 'euclidean'.")
         self.distance = distance
         self.temperature = temperature
-        self.config = {
+        self.config = ModelConfig({
             "model_name_or_path": model_name_or_path,
             "pooling": pooling,
             "distance": distance,
             "temperature": temperature
-        }
+        })
 
     def encode_candidate(self, input_ids: torch.Tensor, attention_mask: torch.Tensor, token_type_ids: Optional[torch.Tensor] = None) -> torch.Tensor:
         return self.encode(input_ids, attention_mask, token_type_ids)

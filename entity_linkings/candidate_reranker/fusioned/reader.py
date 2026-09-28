@@ -7,6 +7,9 @@ from transformers.modeling_outputs import BaseModelOutput
 from transformers.models.t5.configuration_t5 import T5Config
 from transformers.models.t5.modeling_t5 import T5Stack
 
+WRAPPED_ENCODER_EMBED_KEY = "encoder.encoder.embed_tokens.weight"
+T5_ENCODER_EMBED_KEY = "encoder.embed_tokens.weight"
+
 
 class FusionDecoder(T5ForConditionalGeneration):
     def __init__(self, config: T5Config) -> None:
@@ -50,17 +53,36 @@ class FusionDecoder(T5ForConditionalGeneration):
             min_length=min_length
         )
 
+    def retarget_tied_encoder_key(self, wrapped: bool) -> None:
+        """
+        Point the tied-weight mapping at the encoder embeddings' current path.
+
+        T5 declares the tie as `encoder.embed_tokens.weight`, which stops naming a
+        registered parameter once the stack sits behind an EncoderWrapper. Loading
+        then finds a key it never restored, takes it for one the checkpoint supplied,
+        and compares a real tensor against one still on the meta device.
+        """
+        tied = getattr(self, "all_tied_weights_keys", None)
+        if tied is None:
+            return
+        stale, current = (T5_ENCODER_EMBED_KEY, WRAPPED_ENCODER_EMBED_KEY) if wrapped \
+            else (WRAPPED_ENCODER_EMBED_KEY, T5_ENCODER_EMBED_KEY)
+        if stale in tied:
+            tied[current] = tied.pop(stale)
+
     def wrap_encoder(self, use_checkpoint: bool =False) -> None:
         """
         Wrap T5 encoder to obtain a Fusion-in-Decoder model.
         """
         self.encoder = EncoderWrapper(self.encoder, use_checkpoint=use_checkpoint)
+        self.retarget_tied_encoder_key(wrapped=True)
 
     def unwrap_encoder(self) -> None:
         """
         Unwrap Fusion-in-Decoder encoder, useful to load T5 weights.
         """
         self.encoder = self.encoder.encoder
+        self.retarget_tied_encoder_key(wrapped=False)
         block = []
         for mod in self.encoder.block:
             block.append(mod.module)
@@ -83,6 +105,16 @@ class EncoderWrapper(torch.nn.Module):
         self.main_input_name = encoder.main_input_name
         self.encoder = encoder
         apply_checkpoint_wrapper(self.encoder, use_checkpoint)
+
+    @property
+    def embed_tokens(self) -> nn.Module:
+        # T5 reaches through the encoder for its input embeddings when it ties them to
+        # the output ones, which every plain t5-* checkpoint does.
+        return self.encoder.embed_tokens
+
+    @embed_tokens.setter
+    def embed_tokens(self, value: nn.Module) -> None:
+        self.encoder.embed_tokens = value
 
     def forward(self, input_ids: torch.Tensor, attention_mask: torch.Tensor, **kwargs: Any) -> BaseModelOutput:
         bs, total_length = input_ids.size()

@@ -26,8 +26,7 @@ class FusionedPreprocessor(Preprocessor):
                 max_length=self.max_candidate_length,
             )
             return encodings
-        dictionary.add_encoding(preprocess_example)
-        return dictionary
+        return dictionary.with_encoding(preprocess_example)
 
     def process_context(self, text: str, start: int, end: int, candidate_ids: Optional[list[str]] = None, labels: Optional[list[str]] = None) -> BatchEncoding:
         context, new_start, new_end = cut_context_window(text, start, end, self.context_window_chars)

@@ -17,7 +17,7 @@ retriever = retriever_cls(dictionary=dictionary)
 
 
 def test_CollatorBase() -> None:
-    tokenizer = AutoTokenizer.from_pretrained("google-bert/bert-base-uncased")
+    tokenizer = AutoTokenizer.from_pretrained("hf-internal-testing/tiny-random-BertModel")
     collator = CollatorBase(tokenizer=tokenizer)
     assert collator.tokenizer == tokenizer
 

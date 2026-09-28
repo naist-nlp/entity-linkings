@@ -34,6 +34,13 @@ class TextEmbeddingPreprocessor(Preprocessor):
         self.prefix_candidate = prefix_candidate
         self.task_description = task_description
 
+        prefix = ""
+        if self.task_description:
+            prefix += f"Instruct: {self.task_description}\n"
+        prefix += self.prefix_context
+        self.prefix_token_ids = self.tokenizer.encode(prefix, add_special_tokens=False)
+        self.max_context_length -= len(self.prefix_token_ids)
+
     def process_candidate(self, name: str, description: str) -> BatchEncoding:
         marked_text = self.prefix_candidate + name + self.entity_token + description
         encodings  = self.tokenizer(
@@ -57,17 +64,14 @@ class TextEmbeddingPreprocessor(Preprocessor):
         end_marker_idx = input_ids.index(self.end_marker_id)
 
         truncated_input_ids, _, _ = truncate_around_mention(input_ids, self.max_context_length, start_marker_idx, end_marker_idx + 1)
-        prefix = ""
-        if self.task_description:
-            prefix += f"Instruct: {self.task_description}\n"
-        prefix += self.prefix_context
-        prefix_ids = self.tokenizer.encode(prefix, add_special_tokens=False)
-        final_input_ids = self.prefix_ids + prefix_ids + truncated_input_ids + self.suffix_ids
+        final_input_ids = self.prefix_ids + self.prefix_token_ids + truncated_input_ids + self.suffix_ids
 
         encodings = BatchEncoding({
             "input_ids": final_input_ids,
             "attention_mask": [1] * len(final_input_ids),
         })
+        if "token_type_ids" in self.tokenizer.model_input_names:
+            encodings["token_type_ids"] = [0] * len(final_input_ids)
         if labels is not None:
             encodings["labels"] = labels
         if candidate_ids is not None:

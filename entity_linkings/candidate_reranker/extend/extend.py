@@ -11,6 +11,7 @@ from transformers import (
     LongformerForQuestionAnswering,
     set_seed,
 )
+from transformers.trainer_utils import TrainOutput
 
 from entity_linkings.trainer import EntityLinkingTrainer, TrainingArguments
 from entity_linkings.utils import BaseSystemOutput, calculate_top1_accuracy
@@ -45,6 +46,8 @@ class EXTEND(RerankerBase):
         modify_global_attention: int = 2
         mode: str = "max-prod" # "max-prod" or "max-end", "max-start", "max"
 
+    config: Config
+
     def __init__(self, retriever: RetrieverBase, config: Optional[Config] = None) -> None:
         super().__init__(retriever, config)
         self.tokenizer = AutoTokenizer.from_pretrained(self.config.model_name_or_path)
@@ -72,7 +75,7 @@ class EXTEND(RerankerBase):
             eval_dataset: Optional[Dataset] = None,
             num_candidates: int = 30,
             training_args: Optional[TrainingArguments] = None
-        ) -> dict[str, float]:
+        ) -> TrainOutput:
         if training_args is None:
             training_args = TrainingArguments()
         set_seed(training_args.seed)

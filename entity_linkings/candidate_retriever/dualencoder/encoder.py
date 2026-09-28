@@ -4,7 +4,7 @@ from typing import Optional
 import torch
 import torch.nn as nn
 
-from entity_linkings.utils import get_pooler, load_model
+from entity_linkings.utils import ModelConfig, get_pooler, load_model
 
 
 class DualBERTModel(nn.Module):
@@ -28,12 +28,12 @@ class DualBERTModel(nn.Module):
             raise ValueError("Distance must be 'inner_product' or 'cosine'.")
         self.distance = distance
         self.temperature = temperature
-        self.config = {
+        self.config = ModelConfig({
             "model_name_or_path": model_name_or_path,
             "pooling": pooling,
             "distance": distance,
             "temperature": temperature
-        }
+        })
 
     def encode_mention(self, input_ids: torch.Tensor, attention_mask: torch.Tensor, token_type_ids: Optional[torch.Tensor] = None) -> torch.Tensor:
         model_inputs = {"input_ids": input_ids, "attention_mask": attention_mask}

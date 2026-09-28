@@ -7,6 +7,7 @@ from datasets import Dataset
 from torch.utils.data import DataLoader, SequentialSampler
 from tqdm.auto import tqdm
 from transformers import AutoTokenizer, set_seed
+from transformers.trainer_utils import TrainOutput
 
 from entity_linkings.data_utils import Preprocessor
 from entity_linkings.trainer import EntityLinkingTrainer, TrainingArguments
@@ -30,6 +31,8 @@ class FEVRY(RerankerBase):
         nil_token: str = "[NIL]"
         max_context_length: int = 128
         context_window_chars: int = 500
+
+    config: Config
 
     def __init__(self, retriever: RetrieverBase, config: Optional[Config] = None) -> None:
         super().__init__(retriever, config)
@@ -56,7 +59,7 @@ class FEVRY(RerankerBase):
             eval_dataset: Optional[Dataset] = None,
             num_candidates: int = 30,
             training_args: Optional[TrainingArguments] = None
-        ) -> dict[str, float]:
+        ) -> TrainOutput:
         if training_args is None:
             training_args = TrainingArguments()
         set_seed(training_args.seed)

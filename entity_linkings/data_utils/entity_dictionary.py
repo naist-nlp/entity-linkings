@@ -1,4 +1,5 @@
 import abc
+import copy
 import os
 from dataclasses import dataclass
 from typing import Any, Callable, Iterator, Optional, TypedDict
@@ -98,11 +99,18 @@ class EntityDictionary(abc.ABC):
         else:
             return self.default_description.format(name=name)
 
-    def add_encoding(
+    def with_encoding(
             self,
             tokenizer_func: Callable[[str, str], dict[str, list[int]]],
             training_arguments: Optional[TrainingArguments] = None
-        ) -> None:
+        ) -> "EntityDictionary":
+        '''Return a copy carrying the encodings, leaving this dictionary as it was.
+
+        A reranker is built from its retriever's dictionary, and the two encode an
+        entity differently. Writing the encodings back here would hand the retriever
+        the reranker's, which surfaces much later and far away, when the retriever
+        builds its index.
+        '''
         def preprocess(documents: Dataset) -> dict[str, list[Any]]:
             outputs: dict[str, list[Any]] = {"id": [], "name": [], "description": [], "encoding": []}
             for id, name, description in zip(documents["id"], documents["name"], documents["description"]):
@@ -121,4 +129,7 @@ class EntityDictionary(abc.ABC):
             column_names = self.entity_dict.column_names
             dictionary = self.entity_dict.map(preprocess, batched=True, remove_columns=column_names)
 
-        self.entity_dict = dictionary
+        # The rows keep their order and their ids, so the index lookups carry over.
+        encoded = copy.copy(self)
+        encoded.entity_dict = dictionary
+        return encoded

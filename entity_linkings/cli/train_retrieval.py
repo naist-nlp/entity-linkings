@@ -32,11 +32,13 @@ def main(args: Namespace) -> None:
             dataset["validation"] = filter_nil_entities(dataset["validation"], dictionary)
 
     if args.retriever_config is not None:
-        all_config = read_yaml(args.retriever_config)
-        model_config = all_config[args.retriever_id.lower()]
-        training_config = all_config["training_arguments"]
+        model_config = read_yaml(args.retriever_config).get(args.retriever_id, {})
     else:
         model_config = {}
+    # The training arguments do not vary by model, so they live in a file of their own.
+    if args.training_config is not None:
+        training_config = read_yaml(args.training_config).get("training_arguments", {})
+    else:
         training_config = {}
     if args.retriever_model_name_or_path is not None:
         model_config["model_name_or_path"] = args.retriever_model_name_or_path
@@ -85,6 +87,7 @@ def cli_main() -> None:
     parser.add_argument('--retriever_model_name_or_path', type=str, default=None, help='Name of the model to use.')
     parser.add_argument('--retriever_index_dir', type=str, default=None, help='Path to the retriever index directory.')
     parser.add_argument('--retriever_config', type=str, default=None, help='YAML-based config file.')
+    parser.add_argument('--training_config', type=str, default=None, help='YAML-based training arguments file, shared across models.')
     parser.add_argument('--dictionary_id_or_path', '-d', type=str, default=None, help='Path to the entity dictionary file.')
     parser.add_argument('--dataset_id', '-D', type=str, default=None, help='Name of the dataset to use.')
     parser.add_argument('--train_file', type=str, default=None, help='Path to the training dataset file.')

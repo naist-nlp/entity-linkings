@@ -16,7 +16,9 @@ logger.setLevel(logging.INFO)
 class TrainingArguments(transformers.TrainingArguments):
     remove_unused_columns: bool = False
     lr_scheduler_type: str = "linear"
-    warmup_ratio: float = 0.1
+    # warmup_steps took over from warmup_ratio in transformers 5, and reads a float
+    # below 1 as a fraction of the total steps.
+    warmup_steps: float = 0.1
     optim: str = "adamw_torch"
     adam_beta1: float = 0.9
     adam_beta2: float = 0.98
@@ -90,11 +92,6 @@ class EntityLinkingTrainer(Trainer):
                     f"{','.join(outputs.keys())}. For reference, the inputs it received are {','.join(inputs.keys())}."
                 )
             loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
-
-        # Save past state if it exists
-        # TODO: this needs to be fixed and made cleaner later.
-        if self.args.past_index >= 0:
-            self._past = outputs[self.args.past_index]
 
         if self.args.average_tokens_across_devices and num_items_in_batch is not None:
             loss *= self.accelerator.num_processes if self.args.n_gpu <= 1 else self.args.n_gpu
@@ -174,9 +171,6 @@ class EntityLinkingTrainer(Trainer):
                     logits = tuple(v for k, v in outputs.items() if k not in ignore_keys)
                 else:
                     logits = outputs
-                # TODO: this needs to be fixed and made cleaner later.
-                if self.args.past_index >= 0:
-                    self._past = outputs[self.args.past_index - 1]
 
         if prediction_loss_only:
             return (loss, None, None)

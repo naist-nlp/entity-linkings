@@ -10,6 +10,7 @@ from entity_linkings import load_dictionary
 from entity_linkings.utils import BaseSystemOutput
 
 from .bm25 import BM25
+from .indexer import BM25Indexer
 
 dataset_path = str(files(test_data).joinpath("dataset_toy.jsonl"))
 dictionary_path = str(files(test_data).joinpath("dictionary_toy.jsonl"))
@@ -36,8 +37,12 @@ class TestBM25Model:
             )
         )
         assert isinstance(bm25_model, BM25)
-        assert bm25_model.indexer is not None
         assert bm25_model.dictionary is not None
+        # Without an index_path the index is built on first use, so that constructing the
+        # model does not pay for it.
+        assert bm25_model.indexer is None
+        bm25_model.predict("Steve Jobs founded Apple.", spans=[(0, 10)])
+        assert isinstance(bm25_model.indexer, BM25Indexer)
 
     def test_evaluate(self) -> None:
         bm25_model = BM25(dictionary=dictionary)
