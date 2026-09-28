@@ -21,9 +21,11 @@ class PRIOR(RetrieverBase):
     @dataclass
     class Config(RetrieverBase.Config): ...
 
+    config: Config
+
     def __init__(self, dictionary: EntityDictionary, config: Optional[Config] = None, index_path: Optional[str] = None) -> None:
         super().__init__(dictionary, config)
-        self.indexer = self.create_indexer(index_path=index_path)
+        self.indexer = self.create_indexer(index_path=index_path) if index_path is not None else None
 
     def create_indexer(self, index_path: str | None = None) -> MentionPriorIndexer:
         indexer = MentionPriorIndexer(dictionary=self.dictionary, mention_counter_path=self.config.model_name_or_path)
@@ -31,7 +33,7 @@ class PRIOR(RetrieverBase):
         return indexer
 
     def evaluate(self, dataset: Dataset, **args: int) -> dict[str, float]:
-        if not hasattr(self, "indexer"):
+        if self.indexer is None:
             logger.warning("Indexer not found. Creating indexer with default settings. This may take some time if the index is large.")
             self.indexer = self.create_indexer(index_path=None)
 
@@ -58,7 +60,7 @@ class PRIOR(RetrieverBase):
         return metric
 
     def predict(self, sentence: str, spans: Optional[list[tuple[int, int]]] = None, top_k: int = 5) -> list[list[BaseSystemOutput]]:
-        if not hasattr(self, "indexer"):
+        if self.indexer is None:
             logger.warning("Indexer not found. Creating indexer with default settings. This may take some time if the index is large.")
             self.indexer = self.create_indexer(index_path=None)
         if not spans:
@@ -79,7 +81,7 @@ class PRIOR(RetrieverBase):
         return all_result
 
     def retrieve_candidates(self, dataset: Dataset, top_k: int = 5, only_negative: bool = False, batch_size: int = 32, **args: int) -> list[list[str]]:
-        if not hasattr(self, "indexer"):
+        if self.indexer is None:
             logger.warning("Indexer not found. Creating indexer with default settings. This may take some time if the index is large.")
             self.indexer = self.create_indexer(index_path=None)
 
@@ -89,6 +91,10 @@ class PRIOR(RetrieverBase):
             pbar.update()
             text = example['text']
             for ent in example["entities"]:
+                # data_flatten drops mentions with no gold entity, and
+                # dataset_preprocess checks that the candidates line up with it.
+                if not ent['label']:
+                    continue
                 queries.append(text[ent["start"]: ent["end"]])
                 labels.append(ent['label'])
             if len(queries) >= batch_size:

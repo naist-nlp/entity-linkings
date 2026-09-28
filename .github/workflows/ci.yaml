@@ -4,29 +4,28 @@
 name: pytest
 
 on:
-  # Trigger the workflow on push to main or any pull request
-  push:
-    branches: ["main", "develop"]
+  # Only run on pull requests targeting main. A pull_request run tests the result of
+  # merging the branch into main, so a push trigger on main would just repeat it.
   pull_request:
-    types: ["opened", "synchronize"]
+    branches: ["main"]
+    types: ["opened", "synchronize", "reopened"]
+  # Manual run, for checking a branch before opening a pull request for it
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   main:
+    # The suite takes about five minutes locally. Anything near this is a hang, and
+    # without a cap the run would sit on a runner for the default six hours.
+    timeout-minutes: 30
     strategy:
       matrix:
         platform: ["ubuntu-latest"]
-        python-version: ["3.11", "3.12", "3.13"]
-        pytest_marker:
-          - null
-          # - "retriever_dual_encoder"
-          # - "retriever_text_embedding"
-          # - "retriever_bm25"
-          # - "retriever_e5bm25"
-          # - "reranker_fevry"
-          # - "reranker_blink"
-          # - "reranker_chatel"
-          # - "reranker_fusioned"
-          # - "reranker_extend"
+        # The ends of the supported range: the floor in requires-python, and the newest release.
+        python-version: ["3.11", "3.14"]
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -43,6 +42,7 @@ jobs:
       run: uv pip install pip
     - name: Download spaCy model
       run: uv run -- spacy download en_core_web_sm
+    - name: Lint with ruff
+      run: uv run ruff check entity_linkings
     - name: Test with pytest
-      run: |
-        uv run pytest ${{ matrix.pytest_marker && format('-m {0}', matrix.pytest_marker) || '' }}
+      run: uv run pytest -v

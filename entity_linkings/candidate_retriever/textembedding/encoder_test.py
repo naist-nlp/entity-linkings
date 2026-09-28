@@ -6,9 +6,10 @@ import torch
 from .encoder import TextEmbeddingModel
 
 TEXT_EMBEDDING_MODELS = [
-    # TODO: add more models
-    "intfloat/e5-small",
-    "intfloat/multilingual-e5-small"
+    "hf-internal-testing/tiny-random-BertModel",
+    "hf-internal-testing/tiny-random-RobertaModel",
+    "hf-internal-testing/tiny-random-ModernBertModel",
+    "hf-internal-testing/tiny-random-MPNetModel",
 ]
 
 
@@ -53,13 +54,13 @@ class TestTextEmbeddingModel:
                 model_inputs["input_ids"],
                 model_inputs["attention_mask"],
             )
-            assert mention_outputs.size() == (2, 384)
+            assert mention_outputs.size() == (2, model.hidden_size)
 
             candidate_outputs = model.encode(
                 model_inputs["candidates_input_ids"],
                 model_inputs["candidates_attention_mask"],
             )
-            assert candidate_outputs.size() == (4, 384)
+            assert candidate_outputs.size() == (4, model.hidden_size)
 
     @pytest.mark.parametrize("model_name", TEXT_EMBEDDING_MODELS)
     def test_forward(self, model_name: str) -> None:

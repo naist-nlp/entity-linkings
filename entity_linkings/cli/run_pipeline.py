@@ -21,7 +21,7 @@ device = torch.device('cuda') if torch.cuda.is_available() else 'cpu'
 def main(args: Namespace) -> None:
     dictionary = load_dictionary(args.dictionary_id_or_path, cache_dir=args.cache_dir)
     if args.retriever_config is not None:
-        retriever_config = read_yaml(args.retriever_config)[args.retriever_id.lower()]
+        retriever_config = read_yaml(args.retriever_config).get(args.retriever_id, {})
     else:
         retriever_config = {}
     if args.retriever_model_name_or_path is not None:

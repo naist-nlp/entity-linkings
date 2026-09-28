@@ -129,6 +129,24 @@ class TestFaissIndexer:
                     for ind in inds:
                         assert ind not in labels[i]
 
+    @pytest.mark.parametrize("num_ignored", [1, len(dictionary) - 1, len(dictionary)])
+    def test_search_knn_caps_k_by_what_is_left_after_ignoring(self, num_ignored: int) -> None:
+        # The ignored ids are fetched on top of top_k, which used to push K past the
+        # number of vectors held. Faiss pads those rows with -1, and -1 is not a key of
+        # meta_ids_to_keys.
+        indexer = FaissIndexer(
+            model=model,
+            tokenizer=tokenizer,
+            dictionary=processed_dictionary,
+        )
+        indexer.build_index()
+        ignore_ids = [dictionary.get_entity_ids()[:num_ignored]]
+
+        _, indices = indexer.search_knn(["Steve Jobs"], len(dictionary), ignore_ids=ignore_ids)
+
+        assert len(indices[0]) == len(dictionary) - num_ignored
+        assert not set(indices[0]) & set(ignore_ids[0])
+
     def test_save_and_load(self) -> None:
         indexer = FaissIndexer(
             model=model,

@@ -37,11 +37,13 @@ class TEXTEMBEDDING(DUALENCODER):
             - prefix_candidate (str): Prefix to add to candidate texts
             - task_description (str): Task description to add to input texts
         '''
-        model_name_or_path: Optional[str] = "intfloat/e5-base"
+        model_name_or_path: str = "intfloat/e5-base"
         pooling: str = 'mean'
         prefix_context: str = "query: "
         prefix_candidate: str = "passage: "
         task_description: str = ""
+
+    config: Config
 
     def __init__(self, dictionary: EntityDictionary, config: Optional[Config] = None, index_path: Optional[str] = None) -> None:
         self.dictionary = dictionary
@@ -64,16 +66,8 @@ class TEXTEMBEDDING(DUALENCODER):
         self.preprocessor = TextEmbeddingPreprocessor(
             self.tokenizer, self.config.ent_start_token, self.config.ent_end_token,
             self.config.entity_token, self.config.max_context_length,
-            self.config.max_candidate_length, self.config.context_window_chars
+            self.config.max_candidate_length, self.config.context_window_chars,
+            self.config.prefix_context, self.config.prefix_candidate, self.config.task_description
         )
         self.dictionary = self.preprocessor.dictionary_preprocess(self.dictionary)
-        if index_path is not None:
-            self.indexer = self.create_indexer(index_path=index_path)
-
-    def convert_to_query(self, text: str, start: int, end: int) -> str:
-        marked_text = self.preprocessor._process_context(text, start, end)
-        prefix = ""
-        if self.config.task_description:
-            prefix += f"Instruct: {self.config.task_description}\n"
-        prefix += self.config.prefix_context
-        return prefix + marked_text
+        self.indexer = self.create_indexer(index_path=index_path) if index_path is not None else None

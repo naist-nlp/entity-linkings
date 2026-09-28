@@ -35,9 +35,10 @@ class DualEncoderPreprocessor(Preprocessor):
 
         encodings = BatchEncoding({
             "input_ids": final_input_ids,
-            "attention_mask": [1] * len(final_input_ids),
-            "token_type_ids": [0] * len(final_input_ids),
+            "attention_mask": [1] * len(final_input_ids)
         })
+        if "token_type_ids" in self.tokenizer.model_input_names:
+            encodings["token_type_ids"] = [0] * len(final_input_ids)
         if labels is not None:
             encodings["labels"] = labels
         if candidate_ids is not None:

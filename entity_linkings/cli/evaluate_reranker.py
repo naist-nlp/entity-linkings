@@ -26,7 +26,7 @@ def evaluate(args: Namespace) -> None:
         test_dataset = filter_nil_entities(test_dataset, dictionary)
 
     if args.retriever_config is not None:
-        retriever_config = read_yaml(args.retriever_config)[args.retriever_id.lower()]
+        retriever_config = read_yaml(args.retriever_config).get(args.retriever_id, {})
     else:
         retriever_config = {}
     if args.retriever_model_name_or_path is not None:

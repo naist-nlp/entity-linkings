@@ -9,7 +9,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, SequentialSampler
 from tqdm.auto import tqdm
-from transformers import PreTrainedTokenizer
+from transformers import BatchEncoding, PreTrainedTokenizer
 
 from entity_linkings.data_utils import CollatorBase, EntityDictionary
 
@@ -41,6 +41,7 @@ class FaissIndexer(IndexerBase):
         self.fp16 = fp16
         self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         self.batch_size = batch_size
+        self.collator = CollatorBase(tokenizer)
 
     def _initialize(self) -> None:
         self.meta_ids_to_keys: dict[int, str] = {}
@@ -72,7 +73,7 @@ class FaissIndexer(IndexerBase):
 
             dataloader = DataLoader(
                 self.dictionary,
-                collate_fn=CollatorBase(self.tokenizer),
+                collate_fn=self.collator,
                 batch_size=self.batch_size,
                 sampler=SequentialSampler(self.dictionary)
             )
@@ -90,11 +91,19 @@ class FaissIndexer(IndexerBase):
                 self.index.add(entity_embedding)
             pbar.close()
 
+    def prepare_query(self, query: str|list[str]|BatchEncoding|list[BatchEncoding]) -> BatchEncoding:
+        if isinstance(query, str) or (isinstance(query, list) and query and isinstance(query[0], str)):
+            # The tokenizer pads and batches on its own. Passing that on to the collator
+            # would wrap the batch in a second one and give the model a 3D input.
+            return self.tokenizer(query, padding=True, truncation=True, return_tensors="pt")
+        features = query if isinstance(query, list) else [query]
+        return self.collator(features)
+
     @torch.no_grad()
-    def search_knn(self, query: str|list[str], top_k: int, ignore_ids: Optional[list[str]|list[list[str]]] = None) -> tuple[np.ndarray, list[list[str]]]:
+    def search_knn(self, query: str|list[str]|BatchEncoding|list[BatchEncoding], top_k: int, ignore_ids: Optional[list[str]|list[list[str]]] = None) -> tuple[np.ndarray, list[list[str]]]:
         self.model.eval()
         self.model.to(self.device)
-        model_inputs = self.tokenizer(query, padding=True, truncation=True, return_tensors="pt")
+        model_inputs = self.prepare_query(query)
         model_inputs = model_inputs.to(self.device)
         if self.fp16:
             with torch.autocast(device_type=self.device.type):
@@ -103,33 +112,44 @@ class FaissIndexer(IndexerBase):
             query_embed = self.model.encode_mention(**model_inputs).to('cpu').numpy()
         if top_k <= 0:
             raise RuntimeError("K is zero or under zero.")
-        if top_k > len(self.meta_ids_to_keys):
-            top_k = len(self.meta_ids_to_keys)
-            logger.warning(f"K is over size of dictionary. K is modified to size of dictionary to {len(self.meta_ids_to_keys)}")
 
         if self.metric == 'cosine':
             faiss.normalize_L2(query_embed)
 
-        additional_top_k = 0
-        if ignore_ids is not None:
-            if isinstance(ignore_ids[0], list):
-                additional_top_k = max([len(ids) for ids in ignore_ids])
-            else:
-                additional_top_k = len(ignore_ids)
-        scores, results = self.index.search(query_embed, k=top_k+additional_top_k)
+        unwanted = self.normalize_ignore_ids(ignore_ids, len(query_embed))
+        additional_top_k = max((len(ids) for ids in unwanted), default=0)
 
-        indices_keys = []
+        # The ignored ids are dropped after retrieval, so that many hits are fetched on
+        # top of the K that are wanted. Faiss pads the labels with -1 once K passes the
+        # number of vectors it holds, and -1 maps to no entity, so cap K by what is left
+        # once the ignored ids are taken out.
+        index_size = len(self.meta_ids_to_keys)
+        selectable = max(index_size - additional_top_k, 0)
+        if top_k > selectable:
+            logger.warning(f"K is over the number of selectable entities. K is modified to {selectable}.")
+            top_k = selectable
+        fetch_k = min(top_k + additional_top_k, index_size)
+        if fetch_k == 0:
+            return np.zeros((len(query_embed), 0)), [[] for _ in range(len(query_embed))]
+
+        raw_scores, results = self.index.search(query_embed, k=fetch_k)
+
+        # Each row is cut back to top_k, so the scores have to be cut the same way or
+        # they stop lining up with the ids they belong to.
+        kept_scores, indices_keys = [], []
         for i in range(len(results)):
-            if ignore_ids is None:
-                indices_keys.append([self.meta_ids_to_keys[ind] for ind in results[i]])
-                continue
-            candidate_ids = []
-            for j in results[i]:
+            row_scores, candidate_ids = [], []
+            for rank, j in enumerate(results[i]):
                 key = self.meta_ids_to_keys[j]
-                if key not in ignore_ids[i]:
-                    candidate_ids.append(key)
-            indices_keys.append(candidate_ids[:top_k])
-        return scores, indices_keys
+                if key in unwanted[i]:
+                    continue
+                candidate_ids.append(key)
+                row_scores.append(raw_scores[i][rank])
+                if len(candidate_ids) == top_k:
+                    break
+            indices_keys.append(candidate_ids)
+            kept_scores.append(row_scores)
+        return np.array(kept_scores), indices_keys
 
     def save_index(self, index_path: str, ensure_ascii: bool = False) -> None:
         logger.info("Serializing index to %s", index_path)

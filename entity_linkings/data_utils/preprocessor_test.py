@@ -10,12 +10,11 @@ from entity_linkings import get_retrievers, load_dictionary
 from .preprocessor import Preprocessor
 
 MODELS = [
-    "google-bert/bert-base-uncased",
-    "FacebookAI/xlm-roberta-base",
-    "microsoft/deberta-v3-base",
-    "FacebookAI/roberta-base",
-    "answerdotai/ModernBERT-base",
-    "google-t5/t5-small",
+    "hf-internal-testing/tiny-random-BertModel",
+    "hf-internal-testing/tiny-random-DebertaV2Model",
+    "hf-internal-testing/tiny-random-RobertaModel",
+    "hf-internal-testing/tiny-random-ModernBertModel",
+    "hf-internal-testing/tiny-random-T5ForConditionalGeneration",
 ]
 
 dictionary_path = str(files(test_data).joinpath("dictionary_toy.jsonl"))
@@ -44,7 +43,11 @@ class TestPreprocessor:
         assert preprocessor.ent_start_token == "[ENT_START]"
         assert preprocessor.ent_end_token == "[ENT_END]"
         assert preprocessor.entity_token == "[ENTITY]"
-        assert len(preprocessor.prefix_ids) == 0 if model_name.startswith("google-t5") else 1
+        # T5 has no CLS token, so it gets no prefix. Written out rather than as a
+        # conditional expression, which would have bound as `assert (x == 0) if t5 else 1`
+        # and waved every other model through.
+        expected_prefix_ids = 0 if "T5" in model_name else 1
+        assert len(preprocessor.prefix_ids) == expected_prefix_ids
         assert len(preprocessor.suffix_ids) == 1
         assert preprocessor.max_context_length == 512 - len(preprocessor.prefix_ids) - len(preprocessor.suffix_ids)
         assert preprocessor.offset_correction == len(preprocessor.prefix_ids)

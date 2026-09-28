@@ -7,6 +7,7 @@ import assets as test_data
 from entity_linkings import load_dictionary
 from entity_linkings.utils import BaseSystemOutput
 
+from .indexer import MentionPriorIndexer
 from .prior import PRIOR
 
 dataset_path = str(files(test_data).joinpath("dataset_toy.jsonl"))
@@ -29,8 +30,12 @@ def prior_model() -> PRIOR:
 class TestPrior:
     def test_init(self, prior_model: PRIOR) -> None:
         assert isinstance(prior_model, PRIOR)
-        assert prior_model.indexer is not None
         assert prior_model.dictionary is not None
+        # Without an index_path the index is built on first use, so that constructing the
+        # model does not pay for it.
+        assert prior_model.indexer is None
+        prior_model.predict("Steve Jobs founded Apple.", spans=[(0, 10)])
+        assert isinstance(prior_model.indexer, MentionPriorIndexer)
 
     def test_evaluate(self, prior_model: PRIOR) -> None:
         metrics = prior_model.evaluate(dataset)

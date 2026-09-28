@@ -5,7 +5,7 @@ from typing import Optional
 import torch
 import torch.nn as nn
 
-from entity_linkings.utils import load_model
+from entity_linkings.utils import ModelConfig, load_model
 
 
 class SpanClassifier(nn.Module):
@@ -26,7 +26,7 @@ class SpanClassifier(nn.Module):
 
         self.entity_embeddings = nn.Embedding(num_entities, projection_dim)
         self.entity_bias = nn.Embedding(num_entities, 1)
-        self.config = {"model_name_or_path": model_name_or_path, "num_entities": num_entities, "projection_dim": projection_dim}
+        self.config = ModelConfig({"model_name_or_path": model_name_or_path, "num_entities": num_entities, "projection_dim": projection_dim})
 
     def resize_token_embeddings(self, new_num_tokens: int) -> None:
         self.encoder.resize_token_embeddings(new_num_tokens)

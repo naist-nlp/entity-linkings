@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Any, Optional
 
 from datasets import Dataset
+from transformers.trainer_utils import TrainOutput
 
 from entity_linkings.candidate_retriever import RetrieverBase
 from entity_linkings.trainer import TrainingArguments
@@ -30,7 +31,7 @@ class RerankerBase(abc.ABC):
             eval_dataset: Optional[Dataset] = None,
             num_candidates: int = 30,
             training_args: Optional[TrainingArguments] = None
-        ) -> dict[str, float]:
+        ) -> TrainOutput:
         raise NotImplementedError
 
     def evaluate(self, dataset: Dataset, num_candidates: int = 30, batch_size: int = 32, **args: int) -> dict[str, float]:

@@ -12,7 +12,7 @@ from entity_linkings.utils import BaseSystemOutput
 
 from .fevry import FEVRY
 
-MODELS = ["google-bert/bert-base-uncased"]
+MODELS = ["hf-internal-testing/tiny-random-BertModel"]
 dictionary_path = str(files(test_data).joinpath("dictionary_toy.jsonl"))
 dictionary = load_dictionary(dictionary_path)
 dataset_path = str(files(test_data).joinpath("dataset_toy.jsonl"))

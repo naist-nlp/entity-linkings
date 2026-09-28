@@ -12,7 +12,7 @@ from entity_linkings.utils import BaseSystemOutput
 
 from .fusioned import FUSIONED
 
-MODELS = ["google/flan-t5-base"]
+MODELS = ["hf-internal-testing/tiny-random-T5ForConditionalGeneration"]
 dataset_path = str(files(test_data).joinpath("dataset_toy_wo_candidates.jsonl"))
 dictionary_path = str(files(test_data).joinpath("dictionary_toy.jsonl"))
 dictionary = load_dictionary(dictionary_path)
@@ -26,14 +26,17 @@ class TestFUSIONED:
     @pytest.mark.parametrize("use_checkpoint", [True, False])
     def test__init__(self, use_checkpoint: bool) -> None:
         model_cls = get_rerankers("fusioned")
-        model = model_cls(retriever=retriever)
+        model = model_cls(
+            retriever=retriever,
+            config=FUSIONED.Config(model_name_or_path=MODELS[0], use_checkpoint=use_checkpoint)
+        )
         assert isinstance(model, FUSIONED)
         assert hasattr(model, "config") and hasattr(model, "tokenizer") and hasattr(model, "dictionary")
-        assert model.config.model_name_or_path == "google/flan-t5-base"
+        assert model.config.model_name_or_path == "hf-internal-testing/tiny-random-T5ForConditionalGeneration"
         assert model.config.max_context_length == 128
         assert model.config.max_candidate_length == 50
         assert model.config.context_window_chars == 500
-        assert model.config.use_checkpoint == False if not use_checkpoint else True
+        assert model.config.use_checkpoint == use_checkpoint
         assert model.config.num_beams == 3
         assert model.config.max_new_tokens == 200
         assert model.config.min_length == 1

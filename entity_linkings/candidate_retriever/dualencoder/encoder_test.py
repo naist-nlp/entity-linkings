@@ -6,11 +6,10 @@ import torch
 from .encoder import DualBERTModel
 
 BERT_MODELS = [
-    "google-bert/bert-base-uncased",
-    "FacebookAI/xlm-roberta-base",
-    "microsoft/deberta-v3-base",
-    "FacebookAI/roberta-base",
-    "answerdotai/ModernBERT-base",
+    "hf-internal-testing/tiny-random-BertModel",
+    "hf-internal-testing/tiny-random-DebertaV2Model",
+    "hf-internal-testing/tiny-random-RobertaModel",
+    "hf-internal-testing/tiny-random-ModernBertModel",
 ]
 
 def mock_model_inputs(
@@ -54,13 +53,13 @@ class TestDualBERTModel:
                 model_inputs["input_ids"],
                 model_inputs["attention_mask"],
             )
-            assert mention_outputs.size() == (2, 768)
+            assert mention_outputs.size() == (2, model.hidden_size)
 
             candidate_outputs = model.encode_candidate(
                 model_inputs["candidates_input_ids"],
                 model_inputs["candidates_attention_mask"],
             )
-            assert candidate_outputs.size() == (4, 768)
+            assert candidate_outputs.size() == (4, model.hidden_size)
 
     @pytest.mark.parametrize("model_name", BERT_MODELS)
     def test_forward(self, model_name: str) -> None:

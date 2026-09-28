@@ -18,7 +18,7 @@ candidates_ids = retriever.retrieve_candidates(dataset, top_k=3, negative=True)
 
 def test_CollatorForRetrieval() -> None:
     processed_dataset = retriever.preprocessor.dataset_preprocess(dataset, candidates_ids)
-    collator = CollatorForRetrieval(retriever.tokenizer, dictionary=dictionary, num_hard_negatives=2)
+    collator = CollatorForRetrieval(retriever.tokenizer, dictionary=retriever.dictionary, num_hard_negatives=2)
     dataloader = DataLoader(processed_dataset, batch_size=2, collate_fn=collator)
 
     for batch in dataloader:

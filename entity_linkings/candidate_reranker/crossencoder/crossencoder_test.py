@@ -12,7 +12,7 @@ from entity_linkings.utils import BaseSystemOutput
 
 from .crossencoder import CROSSENCODER
 
-MODELS = ["google-bert/bert-base-uncased"]
+MODELS = ["hf-internal-testing/tiny-random-BertModel"]
 dataset_path = str(files(test_data).joinpath("dataset_toy_wo_candidates.jsonl"))
 dictionary_path = str(files(test_data).joinpath("dictionary_toy.jsonl"))
 dictionary = load_dictionary(dictionary_path)
@@ -33,7 +33,7 @@ class TestCROSSENCODER:
         )
         assert isinstance(model, CROSSENCODER)
         assert hasattr(model, "config") and hasattr(model, "tokenizer") and hasattr(model, "dictionary")
-        assert model.config.model_name_or_path == "google-bert/bert-base-uncased"
+        assert model.config.model_name_or_path == "hf-internal-testing/tiny-random-BertModel"
         assert model.config.nil_token == "[NIL]" and model.config.nil_token in model.tokenizer.all_special_tokens
         assert model.config.ent_start_token == "[START_ENT]" and model.config.ent_start_token in model.tokenizer.all_special_tokens
         assert model.config.ent_end_token == "[END_ENT]" and model.config.ent_end_token in model.tokenizer.all_special_tokens

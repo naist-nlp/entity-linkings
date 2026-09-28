@@ -12,7 +12,7 @@ from entity_linkings.trainer import TrainingArguments
 from ..textembedding.encoder import TextEmbeddingModel
 from .e5bm25 import E5BM25
 
-MODELS = ["intfloat/e5-base"]
+MODELS = ["hf-internal-testing/tiny-random-BertModel"]
 
 dataset_path = str(files(test_data).joinpath("dataset_toy_wo_candidates.jsonl"))
 dictionary_path = str(files(test_data).joinpath("dictionary_toy.jsonl"))

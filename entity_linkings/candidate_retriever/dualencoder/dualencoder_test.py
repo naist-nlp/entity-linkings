@@ -14,7 +14,7 @@ from entity_linkings.utils import BaseSystemOutput
 from .dualencoder import DUALENCODER
 from .encoder import DualBERTModel
 
-BERT_MODELS = ["google-bert/bert-base-uncased"]
+BERT_MODELS = ["hf-internal-testing/tiny-random-BertModel"]
 
 dataset_path = str(files(test_data).joinpath("dataset_toy.jsonl"))
 dictionary_path = str(files(test_data).joinpath("dictionary_toy.jsonl"))
@@ -87,6 +87,38 @@ class TestSpanEntityRetrieverForDualEncoder:
             for pred in preds:
                 assert isinstance(pred, BaseSystemOutput)
                 assert pred.id is not None and pred.start is not None and pred.end is not None
+
+    @pytest.mark.parametrize("batch_size", [1, 2, 32])
+    def test_retrieve_candidates_advances_the_bar_by_query_count(
+        self, monkeypatch: pytest.MonkeyPatch, batch_size: int
+    ) -> None:
+        # The bar was advanced by len(queries[i]), the length of one query *string*, so
+        # it drifted apart from its total as soon as a query was shorter than the batch.
+        advanced = []
+
+        class RecordingBar:
+            def __init__(self, total: int, desc: str = "") -> None:
+                self.total = total
+
+            def update(self, n: int = 1) -> None:
+                advanced.append(n)
+
+            def close(self) -> None:
+                pass
+
+        bars: list[RecordingBar] = []
+
+        def _tqdm(total: int, desc: str = "") -> RecordingBar:
+            bar = RecordingBar(total, desc)
+            bars.append(bar)
+            return bar
+
+        monkeypatch.setattr("entity_linkings.candidate_retriever.dualencoder.dualencoder.tqdm", _tqdm)
+        model = DUALENCODER(dictionary=dictionary)
+
+        model.retrieve_candidates(dataset, top_k=3, batch_size=batch_size)
+
+        assert sum(advanced) == bars[0].total
 
     def test_retrieve_candidates(self) -> None:
         model = DUALENCODER(dictionary=dictionary)

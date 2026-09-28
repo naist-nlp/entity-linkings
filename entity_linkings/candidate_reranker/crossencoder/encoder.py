@@ -5,7 +5,7 @@ from typing import Optional
 import torch
 import torch.nn as nn
 
-from entity_linkings.utils import get_pooler, load_model
+from entity_linkings.utils import ModelConfig, get_pooler, load_model
 
 
 class Encoder(nn.Module):
@@ -20,7 +20,7 @@ class Encoder(nn.Module):
         self.encoder = load_model(model_name_or_path)
         self.projection = nn.Linear(self.encoder.config.hidden_size, 1)
         self.pooler = get_pooler(pooling)
-        self.config = {"model_name_or_path": model_name_or_path, "pooling": pooling}
+        self.config = ModelConfig({"model_name_or_path": model_name_or_path, "pooling": pooling})
 
     def resize_token_embeddings(self, new_num_tokens: int) -> None:
         self.encoder.resize_token_embeddings(new_num_tokens)
@@ -57,7 +57,7 @@ class Encoder(nn.Module):
         json.dump(model_config, open(os.path.join(save_directory, "model_config.json"), "w"), indent=2, ensure_ascii=False)
 
     @classmethod
-    def from_pretrained(cls, load_directory: str) -> "CrossEncoder":
+    def from_pretrained(cls, load_directory: str) -> "Encoder":
         model_config = json.load(open(os.path.join(load_directory, "model_config.json")))
         model_config["model_name_or_path"] = load_directory
         model = cls(**model_config)

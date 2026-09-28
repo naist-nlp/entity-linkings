@@ -53,7 +53,8 @@ entitylinkings-train-retrieval \
     --num_train_epochs 10 \
     --train_batch_size 8 \
     --validation_batch_size 16 \
-    --config config.yaml \
+    --retriever_config e5bm25.yaml \
+    --training_config training_args.yaml \
     --wandb
 
 entitylinkings-build-index \
@@ -61,7 +62,7 @@ entitylinkings-build-index \
     --retriever_model_name_or_path save_model/ \
     --dictionary_id_or_path dictionary.jsonl \
     --output_dir e5bm25_index/ \
-    --retriever_config config.yaml
+    --retriever_config e5bm25.yaml
 ```
 
 Next, candidate reranker can trained with ```entitylinkings-train-reranker```.
@@ -82,7 +83,8 @@ entitylinkings-train-reranker \
     --train_batch_size 8 \
     --validation_batch_size 16 \
     --output_dir save_fevry/ \
-    --reranker_config config.yaml \
+    --reranker_config fevry.yaml \
+    --training_config training_args.yaml \
     --wandb
 ```
 
@@ -94,7 +96,7 @@ entitylinkings-eval-retrieval \
     --retriever_index_dir e5bm25_index/ \
     --dictionary_id_or_path dictionary.jsonl \
     --test_file test.jsonl \
-    --config config.yaml \
+    --retriever_config e5bm25.yaml \
     --output_dir result/ \
     --test_batch_size 256 \
     --wandb
@@ -108,14 +110,17 @@ entitylinkings-eval-reranker \
     --retriever_model_name_or_path save_model/ \
     --dictionary_id_or_path dictionary.jsonl \
     --test_file test.jsonl \
-    --config config.yaml \
+    --retriever_config e5bm25.yaml \
+    --reranker_config fevry.yaml \
     --output_dir result/ \
     --test_batch_size 256 \
     --wandb
 ```
 
-You can change the arguments (e.g., context length) using configuration file.
-The config.yaml with default values can be generated via `entitylinkings-gen-config`.
+You can change the arguments (e.g., context length) using configuration files.
+One file per model holds its own settings, and `training_args.yaml` holds the training
+arguments, which are the same whatever the model. Both are generated with their default
+values by `entitylinkings-gen-config`.
 ```sh
 entitylinkings-gen-config
 ```

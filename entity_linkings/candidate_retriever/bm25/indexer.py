@@ -1,4 +1,5 @@
 import json
+import math
 import os
 from logging import getLogger
 from typing import Literal, Optional, Union
@@ -7,6 +8,7 @@ import bm25s
 import numpy as np
 from bm25s.hf import BM25HF
 from bm25s.tokenization import Tokenized
+from tqdm.auto import tqdm
 
 from entity_linkings.data_utils import EntityDictionary
 
@@ -26,7 +28,8 @@ class BM25Indexer(IndexerBase):
             language: str = "en",
             n_threads: int = -1,
             subword_tokenizer: Optional[str] = None,
-            query_type_for_candidate: Literal['mention', 'description'] = 'mention'
+            query_type_for_candidate: Literal['mention', 'description'] = 'mention',
+            batch_size: int = 1024
         ) -> None:
         super().__init__(dictionary)
         if subword_tokenizer is not None:
@@ -40,6 +43,7 @@ class BM25Indexer(IndexerBase):
                 raise NotImplementedError(f"Language {language} is not supported yet.")
         self.n_threads = n_threads
         self.query_type_for_candidate = query_type_for_candidate
+        self.batch_size = batch_size
 
     def whitespace_tokenize(self, texts: Union[str, list[str]]) -> Tokenized:
         def _tokenize(text: list[str]) -> list[str]:
@@ -82,36 +86,65 @@ class BM25Indexer(IndexerBase):
             corpus_tokens = self.tokenize_func(descriptions)
             self.index.index(corpus_tokens)
 
-    def search_knn(self, query: str|list[str], top_k: int, ignore_ids: Optional[list[str]|list[list[str]]] = None) -> tuple[np.ndarray, list[list[str]]]:
+    def search_knn(
+            self,
+            query: str|list[str],
+            top_k: int,
+            ignore_ids: Optional[list[str]|list[list[str]]] = None,
+            batch_size: Optional[int] = None
+        ) -> tuple[np.ndarray, list[list[str]]]:
         if top_k <= 0:
             raise RuntimeError("K is zero or under zero.")
-        if top_k > len(self.meta_ids_to_keys):
-            top_k = len(self.meta_ids_to_keys)
-            logger.warning(f"K is over size of dictionary. K is modified to size of dictionary to {len(self.meta_ids_to_keys)}")
 
-        additional_top_k = 0
-        if ignore_ids is not None:
-            if isinstance(ignore_ids[0], list):
-                additional_top_k = max([len(ids) for ids in ignore_ids])
-            else:
-                additional_top_k = len(ignore_ids)
-        query_tokens = self.tokenize_func(query)
-        results, scores = self.index.retrieve(
-            query_tokens, k=top_k+additional_top_k, n_threads=self.n_threads
+        queries = [query] if isinstance(query, str) else query
+        batch_size = batch_size if batch_size is not None else self.batch_size
+        if not queries:
+            return np.zeros((0, 0)), []
+
+        unwanted = self.normalize_ignore_ids(ignore_ids, len(queries))
+        additional_top_k = max((len(ids) for ids in unwanted), default=0)
+
+        # The ignored ids are dropped after retrieval, so that many hits are fetched on
+        # top of the K that are wanted. bm25s rejects a K larger than the corpus, so cap
+        # K by what is left once the ignored ids are taken out, and never ask the index
+        # for more rows than it holds.
+        index_size = len(self.meta_ids_to_keys)
+        selectable = max(index_size - additional_top_k, 0)
+        if top_k > selectable:
+            logger.warning(f"K is over the number of selectable entities. K is modified to {selectable}.")
+            top_k = selectable
+        fetch_k = min(top_k + additional_top_k, index_size)
+        if fetch_k == 0:
+            return np.zeros((len(queries), 0)), [[] for _ in queries]
+
+        kept_scores, indices_keys = [], []
+        pbar = tqdm(
+            total=math.ceil(len(queries) / batch_size),
+            desc='Search',
+            disable=len(queries) <= batch_size
         )
-
-        indices_keys = []
-        for i in range(results.shape[0]):
-            if not ignore_ids:
-                indices_keys.append([self.meta_ids_to_keys[j] for j in results[i].tolist()])
-                continue
-            candidate_ids = []
-            for j in results[i].tolist():
-                key = self.meta_ids_to_keys[j]
-                if key not in ignore_ids[i]:
+        for offset in range(0, len(queries), batch_size):
+            pbar.update()
+            query_tokens = self.tokenize_func(queries[offset:offset + batch_size])
+            results, scores = self.index.retrieve(
+                query_tokens, k=fetch_k, n_threads=self.n_threads
+            )
+            # Each row is cut back to top_k, so the scores have to be cut the same way
+            # or they stop lining up with the ids they belong to.
+            for i in range(results.shape[0]):
+                row_scores, candidate_ids = [], []
+                for rank, idx in enumerate(results[i].tolist()):
+                    key = self.meta_ids_to_keys[idx]
+                    if key in unwanted[i + offset]:
+                        continue
                     candidate_ids.append(key)
-            indices_keys.append(candidate_ids[:top_k])
-        return scores, indices_keys
+                    row_scores.append(scores[i][rank])
+                    if len(candidate_ids) == top_k:
+                        break
+                indices_keys.append(candidate_ids)
+                kept_scores.append(row_scores)
+        pbar.close()
+        return np.array(kept_scores), indices_keys
 
     def save_index(self, index_path: str, ensure_ascii: bool = False) -> None:
         logger.info("Serializing index to %s", index_path)

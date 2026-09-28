@@ -9,7 +9,7 @@ from entity_linkings import get_retrievers, load_dictionary
 
 from .preprocessor import ExtendPreprocessor, compute_char_to_tokens, process_candidates
 
-MODEL = "allenai/longformer-base-4096"
+MODEL = "hf-internal-testing/tiny-random-LongformerModel"
 dictionary_path = str(files(test_data).joinpath("dictionary_toy.jsonl"))
 dictionary = load_dictionary(dictionary_path)
 tokenizer = AutoTokenizer.from_pretrained(MODEL)
@@ -59,15 +59,20 @@ def test_dataset_preprocess() -> None:
 @pytest.mark.parametrize("gold_titles", [["Meta"], []])
 def test_process_candidates(gold_titles: list[str]) -> None:
     candidate_titles = ["Apple", "Meta", "Amazon"]
-    gold_titles = ["Meta", "Google"]
     context, answer_starts, answer_ends, candidates_offsets = process_candidates(
         candidate_titles,
         gold_titles,
         separator='*'
     )
+    # Written out rather than as a conditional expression, which would have bound as
+    # `assert (starts == [8]) if gold else []` and asserted an empty list when there
+    # was no gold title. The parameter was also being overwritten just above, so only
+    # one of the two cases ever ran.
+    expected_starts = [8] if gold_titles else []
+    expected_ends = [12] if gold_titles else []
     assert context == "Apple * Meta * Amazon * "
-    assert answer_starts == [8] if gold_titles else []
-    assert answer_ends == [12] if gold_titles else []
+    assert answer_starts == expected_starts
+    assert answer_ends == expected_ends
     assert candidates_offsets == [(0, 5), (8, 12), (15, 21)]
 
 
@@ -87,3 +92,21 @@ def test_compute_char_to_tokens() -> None:
         encodings['offset_mapping']
     )
     assert isinstance(char2token, dict)
+
+
+@pytest.mark.parametrize("leading", ["", " ", "\t", "　", "​"])
+def test_compute_char_to_tokens_handles_a_context_that_starts_oddly(leading: str) -> None:
+    # A fast tokenizer returns the offsets as tuples. The prefix-space workaround wrote
+    # back into them, which raised TypeError for any context whose first token did not
+    # begin at zero, such as one led by a tab or a full-width space.
+    candidate_text = f"{leading}Apple * Meta * Amazon *"
+    encodings = tokenizer("Steve Jobs found Apple.", candidate_text, return_offsets_mapping=True)
+
+    char2token = compute_char_to_tokens(
+        candidate_text,
+        [p == 1 for p in encodings.sequence_ids()],
+        encodings["offset_mapping"],
+    )
+
+    assert char2token
+    assert all(isinstance(token_index, int) for token_index in char2token.values())

@@ -7,6 +7,7 @@ from transformers import BatchEncoding
 from transformers.data.data_collator import pad_without_fast_tokenizer_warning
 
 from entity_linkings.data_utils import CollatorBase, EntityDictionary
+from entity_linkings.data_utils.preprocessor import special_token_affixes
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,10 @@ class CollatorForFusioned(CollatorBase):
 
         features = [f.copy() for f in features]
         new_features, batch_labels = [], []
+        # Stands in for prepare_for_model, which transformers 5 removed. Both are
+        # fixed by the tokenizer, so they are worked out once for the whole batch.
+        head_ids, tail_ids = special_token_affixes(self.tokenizer)
+        budget = self.tokenizer.model_max_length - len(head_ids) - len(tail_ids)
         for f in features:
             context_tokens = f.pop("input_ids")
             candidates_ids = f.pop("candidates")
@@ -37,12 +42,11 @@ class CollatorForFusioned(CollatorBase):
                     random.shuffle(candidates)
 
             for cand in candidates:
-                encoding = self.tokenizer.prepare_for_model(
-                    context_tokens + cand['encoding'],
-                    truncation=True,
-                    add_special_tokens=True,
-                )
-                new_features.append(encoding)
+                input_ids = head_ids + (context_tokens + cand['encoding'])[:budget] + tail_ids
+                new_features.append(BatchEncoding({
+                    "input_ids": input_ids,
+                    "attention_mask": [1] * len(input_ids),
+                }))
 
         batch = pad_without_fast_tokenizer_warning(
             self.tokenizer,

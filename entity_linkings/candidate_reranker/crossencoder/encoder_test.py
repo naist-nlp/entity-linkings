@@ -12,12 +12,15 @@ from transformers import (
 
 from .encoder import Encoder
 
+# These cover the architectures the encoder has to work with, at a few MB each
+# instead of several GB. The assertions below are about shapes and plumbing, not
+# about what the weights predict. XLM-RoBERTa has no tiny build and shares its
+# implementation with RoBERTa.
 MODELS = [
-    "google-bert/bert-base-uncased",
-    "FacebookAI/xlm-roberta-base",
-    "microsoft/deberta-v3-base",
-    "FacebookAI/roberta-base",
-    "answerdotai/ModernBERT-base",
+    "hf-internal-testing/tiny-random-BertModel",
+    "hf-internal-testing/tiny-random-RobertaModel",
+    "hf-internal-testing/tiny-random-DebertaV2Model",
+    "hf-internal-testing/tiny-random-ModernBertModel",
 ]
 
 def mock_input(

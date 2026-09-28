@@ -31,6 +31,8 @@ class CHATEL(RerankerBase):
         token: str = "<API_KEY>"
         organization_key: Optional[str] = None
 
+    config: Config
+
     def __init__(self, retriever: RetrieverBase, config: Optional[Config] = None) -> None:
         super().__init__(retriever, config)
         self.model = OpenAI_API(

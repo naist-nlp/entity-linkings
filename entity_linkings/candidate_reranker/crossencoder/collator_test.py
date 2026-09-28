@@ -22,7 +22,7 @@ def test_CollatorForCrossEncoder(train: bool) -> None:
     model = CROSSENCODER(retriever=retriever)
     candidates = retriever.retrieve_candidates(dataset, top_k=3, only_negative=True if train else False)
     processed_dataset = model.preprocessor.dataset_preprocess(dataset, candidates)
-    collator = CollatorForCrossEncoder(model.tokenizer, dictionary=dictionary, train=train)
+    collator = CollatorForCrossEncoder(model.tokenizer, dictionary=model.dictionary, train=train)
     dataloader = DataLoader(processed_dataset, batch_size=2, collate_fn=collator)
 
     for batch in dataloader:

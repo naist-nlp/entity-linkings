@@ -66,3 +66,18 @@ class TestEntityDictionary:
         for i, entity in enumerate(dictionary):
             assert isinstance(entity, dict)
 
+
+
+def test_with_encoding_leaves_the_original_alone() -> None:
+    # A reranker is built from its retriever's dictionary and encodes entities its own
+    # way. Writing that back would hand the retriever the wrong encodings, which only
+    # shows up later, when the retriever gets around to building its index.
+    dictionary = load_dictionary(dictionary_path)
+    assert "encoding" not in dictionary[0]
+
+    encoded = dictionary.with_encoding(lambda name, description: {"input_ids": [1, 2, 3]})
+
+    assert encoded is not dictionary
+    assert "encoding" not in dictionary[0]
+    assert encoded[0]["encoding"] == {"input_ids": [1, 2, 3]}
+    assert encoded.id_to_index == dictionary.id_to_index

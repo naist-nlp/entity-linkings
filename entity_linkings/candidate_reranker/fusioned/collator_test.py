@@ -23,7 +23,7 @@ def test_CollatorForFusioned(train: bool) -> None:
     model = FUSIONED(retriever=retriever)
     candidates_ids = retriever.retrieve_candidates(dataset, top_k=3, only_negative=True if train else False)
     processed_dataset = model.preprocessor.dataset_preprocess(dataset, candidates_ids)
-    collator = CollatorForFusioned(model.tokenizer, dictionary=dictionary, train=train)
+    collator = CollatorForFusioned(model.tokenizer, dictionary=model.dictionary, train=train)
     dataloader = DataLoader(processed_dataset, batch_size=2, collate_fn=collator)
 
     for batch in dataloader:

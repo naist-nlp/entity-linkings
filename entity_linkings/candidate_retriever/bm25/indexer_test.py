@@ -16,7 +16,7 @@ dictionary_path = str(files(test_data).joinpath("dictionary_toy.jsonl"))
 dictionary = load_dictionary(dictionary_path)
 dataset = load_dataset("json", data_files={"test": dataset_path})['test']
 
-MODEL = ["google-bert/bert-base-uncased", None]
+MODEL = ["hf-internal-testing/tiny-random-BertModel", None]
 
 class TestBM25Indexer:
     @pytest.mark.parametrize("model_name", MODEL)
@@ -78,6 +78,39 @@ class TestBM25Indexer:
                 assert len(inds) == top_k
                 for ind in inds:
                     assert ind not in ignore_ids[i]
+
+    @pytest.mark.parametrize("num_ignored", [1, len(dictionary) - 1, len(dictionary)])
+    def test_search_knn_caps_k_by_what_is_left_after_ignoring(self, num_ignored: int) -> None:
+        # The ignored ids are fetched on top of top_k, which used to push K past the
+        # corpus size and make bm25s raise.
+        indexer = BM25Indexer(dictionary)
+        indexer.build_index()
+        ignore_ids = [dictionary.get_entity_ids()[:num_ignored]]
+
+        _, indices = indexer.search_knn(["Steve Jobs"], len(dictionary), ignore_ids=ignore_ids)
+
+        assert len(indices[0]) == len(dictionary) - num_ignored
+        assert not set(indices[0]) & set(ignore_ids[0])
+
+    @pytest.mark.parametrize("ignore_ids", [["-1", "000015"], [["-1", "000015"]]])
+    def test_search_knn_reads_both_shapes_of_ignore_ids(self, ignore_ids: list) -> None:
+        # A flat list means the same ids are unwanted for every query. Indexing it by
+        # query position instead picked out one string and matched candidates against
+        # it as a substring, so everything past the first entry was let through.
+        indexer = BM25Indexer(dictionary)
+        indexer.build_index()
+
+        scores, indices = indexer.search_knn(["Steve Jobs"], 4, ignore_ids=ignore_ids)
+
+        assert not set(indices[0]) & {"-1", "000015"}
+        assert scores.shape[1] == len(indices[0])
+
+    def test_search_knn_rejects_a_mismatched_ignore_ids(self) -> None:
+        indexer = BM25Indexer(dictionary)
+        indexer.build_index()
+
+        with pytest.raises(ValueError, match="one list per query"):
+            indexer.search_knn(["Steve Jobs", "Apple"], 2, ignore_ids=[["-1"]])
 
     def test_save_and_load(self) -> None:
         indexer = BM25Indexer(dictionary)

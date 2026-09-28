@@ -5,12 +5,15 @@ import torch
 
 from .fevry import SpanClassifier
 
+# These cover the architectures the classifier has to work with, at a few MB each
+# instead of several GB. The assertions below are about shapes and plumbing, not
+# about what the weights predict. XLM-RoBERTa has no tiny build and shares its
+# implementation with RoBERTa.
 MODELS = [
-    "google-bert/bert-base-uncased",
-    "FacebookAI/xlm-roberta-base",
-    "microsoft/deberta-v3-base",
-    "FacebookAI/roberta-base",
-    "answerdotai/ModernBERT-base",
+    "hf-internal-testing/tiny-random-BertModel",
+    "hf-internal-testing/tiny-random-RobertaModel",
+    "hf-internal-testing/tiny-random-DebertaV2Model",
+    "hf-internal-testing/tiny-random-ModernBertModel",
 ]
 
 def mock_input(
@@ -34,7 +37,8 @@ class TestSpanClassifier:
     def test_init_(self, model_name: str) -> None:
         encoder = SpanClassifier(model_name_or_path=model_name, num_entities=10)
         assert isinstance(encoder, SpanClassifier)
-        assert encoder.projection.in_features == 1536
+        # The projection takes the start and end states side by side.
+        assert encoder.projection.in_features == encoder.encoder.config.hidden_size * 2
         assert encoder.projection.out_features == 256
         assert encoder.entity_embeddings.num_embeddings == 10
         assert encoder.entity_embeddings.embedding_dim == 256
@@ -51,7 +55,7 @@ class TestSpanClassifier:
                 start_positions=start_positions,
                 end_positions=end_positions,
             )
-            assert span_embeds.size() == (input_ids.size(0), 1536)
+            assert span_embeds.size() == (input_ids.size(0), encoder.encoder.config.hidden_size * 2)
 
     @pytest.mark.parametrize("model_name", MODELS)
     def test_forward(self, model_name: str) -> None:
@@ -73,7 +77,7 @@ class TestSpanClassifier:
             encoder = SpanClassifier(model_name_or_path=MODELS[0], num_entities=20)
             encoder.save_pretrained(tmpdir)
             new_encoder = SpanClassifier.from_pretrained(tmpdir)
-            assert new_encoder.projection.in_features == 1536
+            assert new_encoder.projection.in_features == encoder.encoder.config.hidden_size * 2
             assert new_encoder.projection.out_features == 256
             assert new_encoder.entity_embeddings.num_embeddings == 20
             assert new_encoder.entity_embeddings.embedding_dim == 256

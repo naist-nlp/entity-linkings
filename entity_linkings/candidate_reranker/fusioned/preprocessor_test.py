@@ -8,7 +8,7 @@ from entity_linkings import get_retrievers, load_dictionary
 
 from .preprocessor import FusionedPreprocessor
 
-MODELS = ["google/flan-t5-base"]
+MODELS = ["hf-internal-testing/tiny-random-T5ForConditionalGeneration"]
 dictionary_path = str(files(test_data).joinpath("dictionary_toy.jsonl"))
 dictionary = load_dictionary(dictionary_path)
 dataset_path = str(files(test_data).joinpath("dataset_toy.jsonl"))
